@@ -1,0 +1,157 @@
+'use client'
+
+import { useSearchParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
+
+export default function CheckoutPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const plan = searchParams.get('plan') || 'basic'
+
+  const plans = {
+    basic: {
+      name: 'Basic',
+      price: '29',
+      features: [
+        'Até 3 serviços',
+        'Agendamentos online',
+        'Página pública da barbearia',
+      ],
+    },
+
+    plus: {
+      name: 'Plus',
+      price: '59',
+      features: [
+        'Serviços ilimitados',
+        'Dashboard avançado',
+        'Prioridade no suporte',
+      ],
+    },
+
+    premium: {
+      name: 'Premium',
+      price: '99',
+      features: [
+        'Tudo liberado',
+        'Multi barbeiros',
+        'Recursos premium',
+      ],
+    },
+  }
+
+  const selectedPlan = plans[plan]
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+
+      {/* BANNER */}
+      <div className="w-full relative h-[220px] md:h-[300px] bg-slate-100">
+
+        <Image
+          src="/banner.jpg"
+          alt="BarberShopBR"
+          fill
+          className="object-contain"
+          priority
+          quality={100}
+        />
+
+      </div>
+
+      {/* CONTEÚDO */}
+      <div className="flex-1 flex items-center justify-center px-4 py-10">
+
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+
+          {/* HEADER */}
+          <div className="text-center mb-8">
+
+            <h1 className="text-3xl font-bold text-slate-900">
+              Checkout
+            </h1>
+
+            <p className="text-slate-500 mt-2">
+              Finalize seu plano para continuar
+            </p>
+
+          </div>
+
+          {/* CARD DO PLANO */}
+          <div className="border rounded-2xl p-6 bg-slate-50">
+
+            <div className="text-center">
+
+              <p className="text-sm text-slate-500">
+                Plano selecionado
+              </p>
+
+              <h2 className="text-2xl font-bold text-blue-600 mt-1">
+                {selectedPlan.name}
+              </h2>
+
+              <div className="mt-4">
+
+                <span className="text-4xl font-bold text-slate-900">
+                  R$ {selectedPlan.price}
+                </span>
+
+                <span className="text-slate-500">
+                  /mês
+                </span>
+
+              </div>
+
+            </div>
+
+            {/* BENEFÍCIOS */}
+            <div className="mt-6 space-y-3">
+
+              {selectedPlan.features.map((feature, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 text-slate-700"
+                >
+                  <span className="text-blue-600">✓</span>
+                  <span>{feature}</span>
+                </div>
+              ))}
+
+            </div>
+
+          </div>
+
+          {/* BOTÕES */}
+          <div className="mt-8 space-y-3">
+
+            <button
+              className="w-full bg-blue-600 hover:bg-blue-700 transition text-white py-3 rounded-xl font-medium"
+              onClick={() => {
+                alert('Integração de pagamento será adicionada aqui.')
+              }}
+            >
+              Continuar pagamento
+            </button>
+
+            <button
+              className="w-full border border-slate-300 hover:bg-slate-100 transition py-3 rounded-xl font-medium"
+              onClick={() => router.push('/')}
+            >
+              Voltar
+            </button>
+
+          </div>
+
+          {/* FOOTER */}
+          <p className="text-xs text-slate-400 text-center mt-6">
+            Ambiente seguro • BarberShopBR
+          </p>
+
+        </div>
+
+      </div>
+
+    </div>
+  )
+}
