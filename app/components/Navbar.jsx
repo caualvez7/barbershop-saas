@@ -37,12 +37,16 @@ export default function Navbar() {
             Login
           </Link>
 
-          <Link
-            href="/register?plan=basic"
+          <button
+            onClick={() => {
+              document
+                .getElementById('plans')
+                ?.scrollIntoView({ behavior: 'smooth' })
+            }}
             className="bg-blue-600 hover:bg-blue-700 transition text-white px-4 py-2 rounded-xl"
           >
             Começar agora
-          </Link>
+          </button>
 
         </nav>
 

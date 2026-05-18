@@ -12,14 +12,13 @@ export default function BarberPage() {
   const [shop, setShop] = useState(null)
   const [loading, setLoading] = useState(true)
   const params = useParams()
+  const slug = params?.slug
 
   // 🔥 busca barbearia
 
   useEffect(() => {
 
   const loadShop = async () => {
-
-    const slug = params?.slug
 
     const { data, error } = await supabase
       .from('barbershops')
@@ -66,7 +65,7 @@ if (loading) {
 
           <p className="text-xl text-slate-500 max-w-2xl mx-auto">
 
-            Assine um plano mensal e mantenha seu visual impecável todos os meses.
+            
 
           </p>
 
@@ -152,146 +151,37 @@ if (loading) {
 
 {/* PLANOS */}
 
+{/* CTA */}
+
 <section className="px-6 pb-24">
 
-  <div className="max-w-6xl mx-auto">
+  <div className="max-w-4xl mx-auto">
 
+    <Card className="p-12 text-center rounded-3xl">
 
-    {/* GRID */}
+      <h2 className="text-5xl font-bold text-slate-900 mb-6">
 
-    <div className="grid md:grid-cols-3 gap-8 items-stretch">
+        Faça parte da experiência {shop?.name}
 
-      {/* CARD 1 */}
+      </h2>
 
-      <Card className="p-8 flex flex-col rounded-3xl">
+      <p className="text-slate-500 text-xl mb-10 max-w-2xl mx-auto">
 
-        <h3 className="text-3xl font-bold mb-5">
+        Crie sua conta para acessar os planos exclusivos,
+        benefícios mensais e realizar seus agendamentos.
 
-          Corte Livre
+      </p>
 
-        </h3>
+      <Button
+        onClick={() => window.location.href = `/barber/${slug}/auth`}
+        className="px-10 py-4 text-lg"
+      >
 
-        <p className="text-slate-500 mb-8 text-lg">
+        Começar agora
 
-          Corte quantas vezes quiser durante o mês.
+      </Button>
 
-        </p>
-
-        <div className="mb-10">
-
-          <span className="text-5xl font-bold">
-
-            R$ 84,90
-
-          </span>
-
-          <span className="text-slate-500 text-lg">
-
-            /mês
-
-          </span>
-
-        </div>
-
-        <Button className="w-full mt-auto">
-
-          Assinar agora
-
-        </Button>
-
-      </Card>
-
-      {/* CARD 2 */}
-
-      <Card className="p-8 flex flex-col rounded-3xl border-2 border-blue-600 relative scale-105 shadow-xl">
-
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-
-          <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-
-            Mais popular
-
-          </span>
-
-        </div>
-
-        <h3 className="text-3xl font-bold mb-5 mt-4">
-
-          Corte + Barba
-
-        </h3>
-
-        <p className="text-slate-500 mb-8 text-lg">
-
-          Visual completo todos os meses.
-
-        </p>
-
-        <div className="mb-10">
-
-          <span className="text-5xl font-bold">
-
-            R$ 129,90
-
-          </span>
-
-          <span className="text-slate-500 text-lg">
-
-            /mês
-
-          </span>
-
-        </div>
-
-        <Button className="w-full mt-auto">
-
-          Assinar agora
-
-        </Button>
-
-      </Card>
-
-      {/* CARD 3 */}
-
-      <Card className="p-8 flex flex-col rounded-3xl">
-
-        <h3 className="text-3xl font-bold mb-5">
-
-          Premium VIP
-
-        </h3>
-
-        <p className="text-slate-500 mb-8 text-lg">
-
-          Atendimento premium e benefícios exclusivos.
-
-        </p>
-
-        <div className="mb-10">
-
-          <span className="text-5xl font-bold">
-
-            R$ 199,90
-
-          </span>
-
-          <span className="text-slate-500 text-lg">
-
-            /mês
-
-          </span>
-
-        </div>
-
-        <Button className="w-full mt-auto">
-
-          Assinar agora
-
-        </Button>
-
-      </Card>
-
-    </div>
+    </Card>
 
   </div>
 

@@ -50,6 +50,13 @@ export default function DashboardLayout({ children }) {
               Agendamentos
             </Link>
 
+            <Link 
+            href="/dashboard/plans"
+            className="px-4 py-2 rounded-xl hover:bg-slate-100 text-black transition"
+            >
+              Planos
+            </Link>
+
             <Link
               href="/dashboard/settings"
               className="px-4 py-2 rounded-xl hover:bg-slate-100 text-black transition"
