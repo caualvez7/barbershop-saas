@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 
-    function RegisterPage() {
+    function RegisterContent() {
   const searchParams = useSearchParams()
   const plan = searchParams.get('plan') || 'basic'
   const router = useRouter()
