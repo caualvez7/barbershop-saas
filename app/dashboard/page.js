@@ -3,394 +3,160 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import DashboardLayout from '../components/DashboardLayout.jsx'
-import Card from '../components/ui/Card'
-import Button from '../components/ui/Button'
 import Link from 'next/link'
 
 export default function Dashboard() {
-
-  // 👉 estado para armazenar dados da barbearia
   const [barbershop, setBarbershop] = useState(null)
-
-  // 👉 estado de loading
   const [loading, setLoading] = useState(true)
-
-  // 👉 estado com os dados cliente
   const [appointments, setAppointments] = useState([])
 
-
-const cancelAppointment = async (id) => {
-  const { error } = await supabase
-    .from('appointments')
-    .update({ status: 'Cancelado' })
-    .select()
-    .eq('id', id)
-
-    console.log(error)
-
-  if (error) {
-    alert('Erro ao cancelar')
-    return
+  const updateAppointmentStatus = async (id, status) => {
+    const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
+    if (error) { alert('Erro ao atualizar agendamento.'); return }
+    setAppointments(prev => prev.filter(item => item.id !== id))
   }
-
-  alert('Agendamento cancelado')
-
-  // 🔄 recarregar lista
-  window.location.reload()
-}
 
   useEffect(() => {
-  const getSessionAndData = async () => {
+    const loadData = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
 
-    // 🔥 pega sessão atual
-    const { data: { session } } = await supabase.auth.getSession()
+      const { data: shopData, error } = await supabase
+        .from('barbershops').select('*').eq('user_id', user.id).single()
 
-    console.log('SESSION DASHBOARD:', session)
+      if (error || !shopData) { setLoading(false); return }
+      setBarbershop(shopData)
 
-    if (!session) {
-      console.log('Sem sessão')
+      const { data: apptData } = await supabase
+        .from('appointments')
+        .select('*, services(name), barbers(name)')
+        .eq('barbershop_id', shopData.id)
+        .eq('status', 'Pendente')
+        .order('date', { ascending: true })
+
+      setAppointments(apptData || [])
       setLoading(false)
-      return
     }
-
-    const user = session.user
-
-    console.log('USER DASHBOARD:', user)
-
-    // 🔥 busca barbearia
-    const { data, error } = await supabase
-      .from('barbershops')
-      .select('*')
-
-    console.log('DATA DASHBOARD:', data)
-
-    if (error) {
-      console.log(error)
-      setLoading(false)
-      return
-    }
-
-    if (!data || data.length === 0) {
-      console.log('Nenhuma barbearia encontrada')
-      setLoading(false)
-      return
-    }
-
-    setBarbershop(data[0])
-    setLoading(false)
-  }
-
-  getSessionAndData()
-
-  // 🔥 ESSA PARTE É O SEGREDO
-  const { data: listener } = supabase.auth.onAuthStateChange(
-    (_event, session) => {
-      console.log('Auth mudou:', session)
-      if (session) {
-        getSessionAndData()
-      }
-    }
-  )
-
-  return () => {
-    listener.subscription.unsubscribe()
-  }
-
-}, [])
-
-useEffect(() => {
-  const loadAppointments = async () => {
-
-    // 🔐 pega usuário logado
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return
-
-    // 🔍 pega barbearia do usuário
-    const { data: shop } = await supabase
-      .from('barbershops')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    // 🔥 busca agendamentos + serviço junto
-    const { data, error } = await supabase
-      .from('appointments')
-      .select(`
-        *,
-        services (
-          name
-        )
-      `)
-      .eq('barbershop_id', shop.id)
-      .eq('status', 'Pendente')
-      .order('date', { ascending: true })
-
-    if (error) {
-      console.log(error)
-      return
-    }
-
-    setAppointments(data)
-  }
-
-  loadAppointments()
-}, [])
-
-
-  if (loading) return <p>Carregando...</p>
-
-return (
-
-  <DashboardLayout>
-
-    <div className="space-y-6">
-
-      {/* TOPO */}
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-        <div>
-
-          <h1 className="text-3xl font-bold text-slate-900">
-
-            {barbershop?.name}
-
-          </h1>
-
-          <p className="text-slate-500 mt-1">
-
-            Bem-vindo ao painel da sua barbearia.
-
-          </p>
-
-        </div>
-
-        <Link href={`/barber/${barbershop?.slug}`}>
-
-          <Button>
-
-            Ver minha página
-
-          </Button>
-
-        </Link>
-
-      </div>
-
-      {/* ALERTA */}
-
-      {barbershop?.plan === 'basic' && (
-
-        <Card className="bg-yellow-50 border-yellow-200">
-
-          <p className="text-yellow-800 font-medium">
-
-            Seu plano atual permite até 3 serviços cadastrados.
-
-          </p>
-
-        </Card>
-
-      )}
-
-      {/* CARDS */}
-
-      <div className="grid md:grid-cols-3 gap-4">
-
-        <Card>
-
-          <p className="text-slate-500 text-sm mb-2">
-
-            Plano atual
-
-          </p>
-
-          <h2 className="text-2xl font-bold capitalize">
-
-            {barbershop?.plan}
-
-          </h2>
-
-        </Card>
-
-        <Card>
-
-          <p className="text-slate-500 text-sm mb-2">
-
-            Agendamentos pendentes
-
-          </p>
-
-          <h2 className="text-2xl font-bold">
-
-            {appointments.length}
-
-          </h2>
-
-        </Card>
-
-        <Card>
-
-          <p className="text-slate-500 text-sm mb-2">
-
-            Página pública
-
-          </p>
-
-          <p className="text-sm text-blue-600 break-all">
-
-            /barber/{barbershop?.slug}
-
-          </p>
-
-        </Card>
-
-      </div>
-
-      {/* AÇÕES */}
-
-      <div className="grid md:grid-cols-3 gap-4">
-
-        <Link href="/dashboard/services">
-
-          <Card className="hover:shadow-md transition cursor-pointer">
-
-            <h3 className="font-semibold text-lg mb-2">
-
-              Serviços
-
-            </h3>
-
-            <p className="text-slate-500 text-sm">
-
-              Gerencie os serviços da sua barbearia.
-
-            </p>
-
-          </Card>
-
-        </Link>
-
-        <Card className="hover:shadow-md transition cursor-pointer">
-
-          <h3 className="font-semibold text-lg mb-2">
-
-            Agenda
-
-          </h3>
-
-          <p className="text-slate-500 text-sm">
-
-            Veja os próximos atendimentos.
-
-          </p>
-
-        </Card>
-
-        <Card className="hover:shadow-md transition cursor-pointer">
-
-          <h3 className="font-semibold text-lg mb-2">
-
-            Configurações
-
-          </h3>
-
-          <p className="text-slate-500 text-sm">
-
-            Personalize sua barbearia.
-
-          </p>
-
-        </Card>
-
-      </div>
-
-      {/* AGENDAMENTOS */}
-
-      <Card>
-
-        <div className="flex items-center justify-between mb-6">
-
-          <h2 className="text-2xl font-bold">
-
-            Agendamentos
-
-          </h2>
-
-        </div>
-
-        {appointments.length === 0 ? (
-
-          <p className="text-slate-500">
-
-            Nenhum agendamento pendente.
-
-          </p>
-
-        ) : (
-
-          <div className="space-y-4">
-
-            {appointments.map((item) => (
-
-              <div
-                key={item.id}
-                className="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-              >
-
-                <div>
-
-                  <h3 className="font-semibold text-slate-900">
-
-                    {item.customer_name}
-
-                  </h3>
-
-                  <p className="text-sm text-slate-500">
-
-                    {item.services?.name}
-
-                  </p>
-
-                  <p className="text-sm text-slate-500">
-
-                    {item.date} às {item.time}
-
-                  </p>
-
-                </div>
-
-                <div className="flex items-center gap-3">
-
-                  <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-
-                    {item.status}
-
-                  </span>
-
-                  <Button
-                    variant="danger"
-                    onClick={() => cancelAppointment(item.id)}
-                  >
-                    Cancelar
-                  </Button>
-
-                </div>
-
-              </div>
-
-            ))}
-
+    loadData()
+  }, [])
+
+  if (loading) return <DashboardLayout><p style={{ color: '#6b6b67', fontSize: '0.9rem' }}>Carregando...</p></DashboardLayout>
+
+  return (
+    <DashboardLayout>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', maxWidth: '900px' }}>
+
+        {/* TOPO */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.75rem', fontWeight: 400, letterSpacing: '-0.02em', color: '#1a1a18', marginBottom: '0.25rem' }}>
+              {barbershop?.name}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#6b6b67', fontWeight: 300 }}>Bem-vindo ao painel da sua barbearia.</p>
           </div>
+          <Link href={`/barber/${barbershop?.slug}`} style={{
+            background: '#1a1a18', color: '#fafaf9', textDecoration: 'none',
+            padding: '0.55rem 1.1rem', borderRadius: '100px', fontSize: '0.875rem',
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
+            Ver minha página
+          </Link>
+        </div>
 
+        {/* ALERTA PLANO BASIC */}
+        {barbershop?.plan === 'basic' && (
+          <div style={{ background: '#fffbeb', border: '0.5px solid #fcd34d', borderRadius: '12px', padding: '0.85rem 1rem' }}>
+            <p style={{ fontSize: '0.875rem', color: '#92400e' }}>
+              Seu plano atual permite até 3 serviços cadastrados.{' '}
+              <Link href="/#plans" style={{ color: '#2563eb', textDecoration: 'none' }}>Fazer upgrade</Link>
+            </p>
+          </div>
         )}
 
-      </Card>
+        {/* CARDS DE RESUMO */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          {[
+            { label: 'Plano atual', value: barbershop?.plan, capitalize: true },
+            { label: 'Agendamentos pendentes', value: appointments.length },
+            { label: 'Página pública', value: `/barber/${barbershop?.slug}`, small: true, blue: true },
+          ].map((card, i) => (
+            <div key={i} style={{ background: '#fff', border: '0.5px solid #e5e3dd', borderRadius: '16px', padding: '1.25rem' }}>
+              <p style={{ fontSize: '0.78rem', color: '#9e9c96', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</p>
+              <p style={{
+                fontSize: card.small ? '0.8rem' : '1.5rem',
+                fontWeight: card.small ? 400 : 500,
+                color: card.blue ? '#2563eb' : '#1a1a18',
+                textTransform: card.capitalize ? 'capitalize' : 'none',
+                wordBreak: 'break-all',
+              }}>
+                {card.value}
+              </p>
+            </div>
+          ))}
+        </div>
 
-    </div>
+        {/* AÇÕES RÁPIDAS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          {[
+            { href: '/dashboard/services', title: 'Serviços', desc: 'Gerencie os serviços da sua barbearia.' },
+            { href: '/dashboard/appointments', title: 'Agendamentos', desc: 'Veja os atendimentos concluídos hoje.' },
+            { href: '/dashboard/settings', title: 'Configurações', desc: 'Personalize sua barbearia.' },
+          ].map(item => (
+            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{ background: '#fff', border: '0.5px solid #e5e3dd', borderRadius: '16px', padding: '1.25rem', cursor: 'pointer', transition: 'border-color .2s' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#1a1a18'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#e5e3dd'}
+              >
+                <p style={{ fontSize: '0.95rem', fontWeight: 500, color: '#1a1a18', marginBottom: '0.35rem' }}>{item.title}</p>
+                <p style={{ fontSize: '0.825rem', color: '#6b6b67', fontWeight: 300 }}>{item.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-  </DashboardLayout>
+        {/* AGENDAMENTOS PENDENTES */}
+        <div style={{ background: '#fff', border: '0.5px solid #e5e3dd', borderRadius: '16px', padding: '1.5rem' }}>
+          <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.25rem', fontWeight: 400, color: '#1a1a18', marginBottom: '1.25rem' }}>
+            Agendamentos pendentes
+          </h2>
 
+          {appointments.length === 0 ? (
+            <p style={{ fontSize: '0.875rem', color: '#9e9c96' }}>Nenhum agendamento pendente.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {appointments.map(item => (
+                <div key={item.id} style={{
+                  border: '0.5px solid #e5e3dd', borderRadius: '12px', padding: '1rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem',
+                }}>
+                  <div>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#1a1a18', marginBottom: '0.2rem' }}>{item.customer_name}</p>
+                    <p style={{ fontSize: '0.8rem', color: '#6b6b67', fontWeight: 300 }}>{item.services?.name}{item.barbers?.name ? ` com ${item.barbers.name}` : ''} · {item.date} às {item.time}</p>  
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', background: '#eef2ff', color: '#3730a3', padding: '0.25rem 0.75rem', borderRadius: '100px' }}>
+                      Pendente
+                    </span>
+                    <button
+                      onClick={() => updateAppointmentStatus(item.id, 'Concluído')}
+                      style={{ fontSize: '0.8rem', color: '#16a34a', background: '#f0fdf4', border: '0.5px solid #86efac', padding: '0.3rem 0.75rem', borderRadius: '100px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                    >
+                      Concluir
+                    </button>
+                    <button
+                      onClick={() => updateAppointmentStatus(item.id, 'Cancelado')}
+                      style={{ fontSize: '0.8rem', color: '#dc2626', background: '#fef2f2', border: '0.5px solid #fca5a5', padding: '0.3rem 0.75rem', borderRadius: '100px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </DashboardLayout>
   )
 }

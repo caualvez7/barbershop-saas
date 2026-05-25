@@ -2,48 +2,36 @@
 
 import Link from 'next/link'
 
-export default function Navbar() {
+export default function Navbar({ onCTAClick }) {
+  const scrollToPlans = () => {
+    document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
-    <header className="w-full border-b bg-white/80 backdrop-blur sticky top-0 z-50">
+    <header style={{
+      width: '100%', borderBottom: '0.5px solid #e5e3dd',
+      background: 'rgba(250,250,249,0.92)', backdropFilter: 'blur(12px)',
+      position: 'sticky', top: 0, zIndex: 100,
+    }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 2rem', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-
-        {/* LOGO */}
-        <Link
-          href=""
-          className="text-xl font-bold text-slate-900"
-        >
-          BarberShop<span className="text-blue-600">BR</span>
+        <Link href="/" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.35rem', color: '#1a1a18', textDecoration: 'none', letterSpacing: '-0.01em' }}>
+          Barber<span style={{ color: '#2563eb' }}>ShopBR</span>
         </Link>
 
-        {/* LINKS */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
 
-          <button
-            onClick={() => {
-              document
-                .getElementById('plans')
-                ?.scrollIntoView({ behavior: 'smooth' })
-            }}
-            className="text-slate-600 hover:text-slate-900 transition"
-          >
+          <button onClick={scrollToPlans} style={{ background: 'none', border: 'none', fontSize: '0.875rem', color: '#6b6b67', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif' " }}>
             Planos
           </button>
 
-          <Link
-            href="/login"
-            className="text-slate-600 hover:text-slate-900 transition"
-          >
-            Login
+          <Link href="/login" style={{ fontSize: '0.875rem', color: '#6b6b67', textDecoration: 'none' }}>
+            Entrar
           </Link>
 
           <button
-            onClick={() => {
-              document
-                .getElementById('plans')
-                ?.scrollIntoView({ behavior: 'smooth' })
-            }}
-            className="bg-blue-600 hover:bg-blue-700 transition text-white px-4 py-2 rounded-xl"
+            onClick={onCTAClick}
+            style={{ background: '#1a1a18', color: '#fafaf9', border: 'none', padding: '0.55rem 1.25rem', borderRadius: '100px', fontSize: '0.875rem', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer' }}
           >
             Começar agora
           </button>
@@ -51,7 +39,6 @@ export default function Navbar() {
         </nav>
 
       </div>
-
     </header>
   )
 }

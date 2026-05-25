@@ -1,156 +1,136 @@
-'use client' 
-// 👉 Indica que esse componente roda no cliente (browser)
-// Necessário para usar estado (useState) e eventos
+'use client'
 
 import { useState } from 'react'
-// 👉 Hook do React para controlar estado (inputs, loading, etc)
-
 import { supabase } from '../../lib/supabase'
-// 👉 Importa o cliente que você criou para conectar com o Supabase
-
 import { useRouter } from 'next/navigation'
-import Card from '../components/ui/Card.jsx'
-import Input from '../components/ui/Input.jsx'
-import Button from '../components/ui/Button.jsx'
 import Link from 'next/link'
 
 export default function LoginPage() {
-
   const router = useRouter()
-
-  // 👉 Estados para armazenar os valores digitados
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
-  // 👉 Estado para controlar carregamento (UX)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  // 👉 Função chamada ao clicar no botão
   const handleLogin = async () => {
+    setError('')
 
-    setLoading(true) 
-    // 👉 Ativa o estado de loading (ex: botão "Entrando...")
-
-    // 🔐 Faz login no Supabase
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,     // 👉 email digitado
-      password,  // 👉 senha digitada
-    })
-
-    console.log('LOGIN DATA: ', data)
-    console.log('LOGIN ERROR: ', error)
-
-    // 👉 Se deu erro no login
-    if (error) {
-      alert(error.message) // mostra erro
-      setLoading(false)    // para loading
-      return               // encerra função
+    if (!email.trim() || !password.trim()) {
+      setError('Preencha todos os campos.')
+      return
     }
 
-    // 👉 Se deu certo
-    router.push('/dashboard')
+    setLoading(true)
 
-    setLoading(false)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      setError('Email ou senha incorretos.')
+      setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
   }
 
-  // 🎨 Interface simples
   return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; background: #fafaf9; color: #1a1a18; }
+        .auth-input {
+          width: 100%; border: 0.5px solid #e5e3dd; border-radius: 12px;
+          padding: 0.75rem 1rem; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+          color: #1a1a18; background: #fff; outline: none; transition: border-color .2s;
+        }
+        .auth-input:focus { border-color: #2563eb; }
+        .auth-btn {
+          width: 100%; background: #1a1a18; color: #fafaf9; border: none;
+          padding: 0.85rem; border-radius: 100px; font-size: 0.9rem;
+          font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity .2s;
+        }
+        .auth-btn:hover { opacity: .85; }
+        .auth-btn:disabled { opacity: .5; cursor: not-allowed; }
+      `}</style>
 
-  <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div style={{ minHeight: '100vh', background: '#fafaf9', display: 'flex', flexDirection: 'column' }}>
 
-    <div className="w-full max-w-md">
+        {/* NAVBAR */}
+        <header style={{ padding: '1.25rem 2rem', borderBottom: '0.5px solid #e5e3dd' }}>
+          <Link href="/" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.35rem', color: '#1a1a18', textDecoration: 'none', letterSpacing: '-0.01em' }}>
+            Barber<span style={{ color: '#2563eb' }}>ShopBR</span>
+          </Link>
+        </header>
 
-      {/* LOGO */}
+        {/* CONTEÚDO */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '420px' }}>
 
-      <div className="text-center mb-8">
+            {/* TOPO */}
+            <div style={{ marginBottom: '2.5rem' }}>
+              <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '2rem', fontWeight: 400, letterSpacing: '-0.02em', color: '#1a1a18', marginBottom: '0.4rem' }}>
+                Bem-vindo de volta
+              </h1>
+              <p style={{ fontSize: '0.9rem', color: '#6b6b67', fontWeight: 300 }}>
+                Acesse o painel da sua barbearia.
+              </p>
+            </div>
 
-        <h1 className="text-4xl font-bold text-slate-900">
+            {/* ERRO */}
+            {error && (
+              <div style={{ background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                <p style={{ fontSize: '0.875rem', color: '#dc2626' }}>{error}</p>
+              </div>
+            )}
 
-          BarberShop<span className="text-blue-600">BR</span>
+            {/* FORM */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-        </h1>
+              <div>
+                <label style={{ fontSize: '0.825rem', color: '#6b6b67', display: 'block', marginBottom: '0.4rem' }}>Email</label>
+                <input
+                  className="auth-input"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
 
-        <p className="text-slate-500 mt-2">
+              <div>
+                <label style={{ fontSize: '0.825rem', color: '#6b6b67', display: 'block', marginBottom: '0.4rem' }}>Senha</label>
+                <input
+                  className="auth-input"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
 
-          Acesse sua barbearia
+              <button className="auth-btn" onClick={handleLogin} disabled={loading} style={{ marginTop: '0.5rem' }}>
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
 
-        </p>
+            </div>
+
+            {/* FOOTER */}
+            <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e5e3dd', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.875rem', color: '#6b6b67', fontWeight: 300 }}>
+                Ainda não tem conta?{' '}
+                <Link href="/#plans" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 400 }}>
+                  Escolher um plano
+                </Link>
+              </p>
+            </div>
+
+          </div>
+        </div>
 
       </div>
-
-      {/* CARD */}
-
-      <Card>
-
-        <div className="space-y-4">
-
-          <div>
-
-            <label className="text-sm text-slate-600 mb-2 block">
-
-              Email
-
-            </label>
-
-            <Input
-              placeholder="Digite seu email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-          </div>
-
-          <div>
-
-            <label className="text-sm text-slate-600 mb-2 block">
-
-              Senha
-
-            </label>
-
-            <Input
-              type="password"
-              placeholder="Digite sua senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-          </div>
-
-          <Button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </Button>
-
-        </div>
-
-        {/* FOOTER */}
-
-        <div className="mt-6 text-center">
-
-          <p className="text-sm text-slate-500">
-
-            Ainda não possui conta?
-
-          </p>
-
-          <Link
-            href="/#plans"
-            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-          >
-            Escolher plano
-          </Link>
-
-        </div>
-
-      </Card>
-
-    </div>
-
-  </div>
-
+    </>
   )
 }
