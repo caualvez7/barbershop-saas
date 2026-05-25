@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 
-export default function RegisterPage() {
+    function RegisterPage() {
   const searchParams = useSearchParams()
   const plan = searchParams.get('plan') || 'basic'
   const router = useRouter()
@@ -211,5 +212,17 @@ export default function RegisterPage() {
 
       </div>
     </>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafaf9' }}>
+        <p style={{ fontSize: '0.9rem', color: '#6b6b67', fontFamily: "'DM Sans', sans-serif" }}>Carregando...</p>
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   )
 }
