@@ -24,6 +24,7 @@ export default function PlansPage() {
   // { 'Corte de Cabelo': { benefit_type: 'free' | 'discount', discount_percent: '' } }
 
   const loadData = async () => {
+    await supabase.auth.refreshSession()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 

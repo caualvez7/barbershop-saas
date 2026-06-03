@@ -34,6 +34,7 @@ export default function SettingsPage() {
   )
 
   const loadData = async () => {
+    await supabase.auth.refreshSession()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 

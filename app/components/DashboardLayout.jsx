@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+
+
 
 const navItems = [
   {
@@ -98,6 +100,14 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+      useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 768)
+        check()
+        window.addEventListener('resize', check)
+        return () => window.removeEventListener('resize', check)
+      }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -177,27 +187,29 @@ export default function DashboardLayout({ children }) {
           {/* SIDEBAR */}
           <aside
             className="sidebar"
-            style={{
-              width: collapsed ? '60px' : '220px',
-              borderRight: '0.5px solid #e5e3dd',
-              background: '#fff',
-              padding: collapsed ? '1.5rem 0.5rem' : '1.5rem 1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.25rem',
-              position: 'sticky',
-              top: '60px',
-              height: 'calc(100vh - 60px)',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-            }}
+              style={{
+                display: isMobile ? 'none' : 'flex',
+                width: isMobile ? '0px' : collapsed ? '60px' : '220px',
+                borderRight: isMobile ? 'none' : '0.5px solid #e5e3dd',
+                background: '#fff',
+                padding: collapsed ? '1.5rem 0.5rem' : '1.5rem 1rem',
+                flexDirection: 'column',
+                gap: '0.25rem',
+                position: 'sticky',
+                top: '60px',
+                height: 'calc(100vh - 60px)',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+              }}
           >
               {/* TOGGLE */}
-            <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', marginBottom: '0.75rem' }}>
-              <button className="toggle-btn" onClick={() => setCollapsed(!collapsed)}>
-                <SidebarToggleIcon collapsed={collapsed} />
-              </button>
-            </div>
+              {!isMobile && (
+                <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', marginBottom: '0.75rem' }}>
+                  <button className="toggle-btn" onClick={() => setCollapsed(!collapsed)}>
+                    <SidebarToggleIcon collapsed={collapsed} />
+                  </button>
+                </div>
+              )}
             
             {navItems.map(item => (
               <Link
@@ -216,12 +228,12 @@ export default function DashboardLayout({ children }) {
           </aside>
 
           {/* CONTEÚDO */}
-          <main style={{ flex: 1, padding: '2rem', maxWidth: '100%', overflowX: 'hidden' }}>
+          <main style={{ flex: 1, padding: '2rem', maxWidth: '100%', overflowX: 'hidden', paddingBottom: isMobile ? '80px' : '2rem', }}>
             {children}
           </main>
 
         </div>
-
+         
       </div>
     </>
   )

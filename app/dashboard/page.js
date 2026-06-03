@@ -18,6 +18,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadData = async () => {
+      await supabase.auth.refreshSession()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
@@ -100,6 +101,8 @@ export default function Dashboard() {
           {[
             { href: '/dashboard/services', title: 'Serviços', desc: 'Gerencie os serviços da sua barbearia.' },
             { href: '/dashboard/appointments', title: 'Agendamentos', desc: 'Veja os atendimentos concluídos hoje.' },
+            { href: '/dashboard/plans', title: 'Planos', desc: 'Gerencie os planos de assinatura.' },
+            { href: '/dashboard/barbers', title: 'Barbeiros', desc: 'Gerencie os barbeiros da sua barbearia.' },
             { href: '/dashboard/settings', title: 'Configurações', desc: 'Personalize sua barbearia.' },
           ].map(item => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>

@@ -11,6 +11,7 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     const loadData = async () => {
+      await supabase.auth.refreshSession()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 

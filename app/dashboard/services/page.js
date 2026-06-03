@@ -15,6 +15,7 @@ export default function ServicesPage() {
   const [barbershop, setBarbershop] = useState(null)
 
   const loadData = async () => {
+    await supabase.auth.refreshSession()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
