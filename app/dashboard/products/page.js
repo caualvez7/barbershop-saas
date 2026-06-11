@@ -149,7 +149,19 @@ export default function ProductsPage() {
 
   // Carregar dados simulados em caso de falta de tabela no Supabase
   const loadMockData = (shopId, slug) => {
-    const mockProducts = [
+    let savedLocalProducts = []
+    if (typeof window !== 'undefined' && slug) {
+      const saved = localStorage.getItem(`mock_products_${slug}`)
+      if (saved) {
+        try {
+          savedLocalProducts = JSON.parse(saved)
+        } catch (e) {
+          console.error('Erro ao ler mock_products:', e)
+        }
+      }
+    }
+
+    const defaultMockProducts = [
       {
         id: 'mock-1',
         name: 'Shampoo Carbon Cabelo & Barba',
@@ -195,7 +207,14 @@ export default function ProductsPage() {
         barbershop_id: shopId
       }
     ]
-    setProducts(mockProducts)
+
+    const productsList = savedLocalProducts.length > 0 ? savedLocalProducts : defaultMockProducts
+    setProducts(productsList)
+    if (typeof window !== 'undefined' && slug && savedLocalProducts.length === 0) {
+      localStorage.setItem(`mock_products_${slug}`, JSON.stringify(defaultMockProducts))
+    }
+
+    const mockProducts = productsList
 
     const mockSales = [
       {
@@ -338,17 +357,20 @@ export default function ProductsPage() {
 
     if (databaseWarning) {
       // Operações locais simuladas
+      let updatedProducts = []
       if (modalMode === 'create') {
         const newProduct = {
           ...payload,
           id: 'mock-' + Date.now(),
           created_at: new Date().toISOString()
         }
-        setProducts(prev => [newProduct, ...prev])
+        updatedProducts = [newProduct, ...products]
       } else {
-        setProducts(prev => 
-          prev.map(p => p.id === currentProductId ? { ...p, ...payload } : p)
-        )
+        updatedProducts = products.map(p => p.id === currentProductId ? { ...p, ...payload } : p)
+      }
+      setProducts(updatedProducts)
+      if (typeof window !== 'undefined' && barbershop?.slug) {
+        localStorage.setItem(`mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
       }
       setSaving(false)
       setModalOpen(false)
@@ -387,7 +409,11 @@ export default function ProductsPage() {
     setDeleting(true)
 
     if (databaseWarning) {
-      setProducts(prev => prev.filter(p => p.id !== productToDelete.id))
+      const updatedProducts = products.filter(p => p.id !== productToDelete.id)
+      setProducts(updatedProducts)
+      if (typeof window !== 'undefined' && barbershop?.slug) {
+        localStorage.setItem(`mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
+      }
       setDeleting(false)
       setDeleteModalOpen(false)
       setProductToDelete(null)

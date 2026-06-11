@@ -51,11 +51,14 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [notificationsCount, setNotificationsCount] = useState(3)
+  const [notificationsCount, setNotificationsCount] = useState(0)
+  const [notifications, setNotifications] = useState([])
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
   const { barbershop, loading: checkingAuth } = useDashboard()
+
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -63,6 +66,108 @@ export default function DashboardLayout({ children }) {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  useEffect(() => {
+    if (!barbershop) return
+
+    const fetchPendingNotifications = async () => {
+      try {
+        // 1. Buscar agendamentos com status 'Pendente' no banco
+        const { data: appData, error: appError } = await supabase
+          .from('appointments')
+          .select('id, customer_name, date, time, created_at')
+          .eq('barbershop_id', barbershop.id)
+          .eq('status', 'Pendente')
+
+        let pendingAppsList = []
+        if (!appError && appData) {
+          pendingAppsList = appData.map(app => ({
+            id: `app-${app.id}`,
+            type: 'appointment',
+            title: 'Novo Agendamento Pendente',
+            description: `${app.customer_name} agendou para ${app.date.split('-').reverse().join('/')} às ${app.time}`,
+            link: '/dashboard/appointments',
+            created_at: app.created_at || new Date().toISOString()
+          }))
+        }
+
+        // 2. Buscar pedidos do banco (se a tabela product_sales existir)
+        let pendingOrdersList = []
+        try {
+          const { data: dbSales, error: salesError } = await supabase
+            .from('product_sales')
+            .select('id, created_at, quantity, price_at_purchase, products(name), customer_id')
+            .eq('barbershop_id', barbershop.id)
+            .eq('status', 'pending')
+
+          if (!salesError && dbSales && dbSales.length > 0) {
+            // fetch customer names
+            const customerIds = [...new Set(dbSales.map(s => s.customer_id).filter(Boolean))]
+            const { data: customersData } = customerIds.length > 0 
+              ? await supabase.from('customers').select('id, name').in('id', customerIds) 
+              : { data: [] }
+            const customerMap = {}
+            customersData?.forEach(c => { customerMap[c.id] = c.name })
+
+            pendingOrdersList = dbSales.map(sale => ({
+              id: `sale-${sale.id}`,
+              type: 'order',
+              title: 'Pedido de Retirada Pendente',
+              description: `${customerMap[sale.customer_id] || 'Cliente'} reservou ${sale.products?.name || 'Produto'} (Qtd: ${sale.quantity})`,
+              link: '/dashboard/products',
+              created_at: sale.created_at
+            }))
+          }
+        } catch (e) {
+          console.warn('Erro ao carregar product_sales do banco para notificações:', e)
+        }
+
+        // 3. Buscar pedidos pendentes de retirada no localStorage
+        let localOrdersList = []
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem(`mock_orders_${barbershop.slug}`)
+          if (saved) {
+            try {
+              const orders = JSON.parse(saved)
+              localOrdersList = orders
+                .filter(o => o.status === 'pending')
+                .map(o => ({
+                  id: o.id,
+                  type: 'order',
+                  title: 'Pedido de Retirada Pendente (Local)',
+                  description: `${o.customer?.name || 'Cliente'} reservou ${o.product?.name || 'Produto'} (Qtd: ${o.quantity})`,
+                  link: '/dashboard/products',
+                  created_at: o.created_at || new Date().toISOString()
+                }))
+            } catch (e) {
+              console.error('Erro ao ler mock_orders para notificações:', e)
+            }
+          }
+        }
+
+        // Mesclar listas sem duplicar
+        const mergedOrders = [...pendingOrdersList]
+        localOrdersList.forEach(lo => {
+          const rawId = lo.id.replace('order-', '').replace('mock-', '')
+          if (!mergedOrders.some(mo => mo.id.toString().includes(rawId))) {
+            mergedOrders.push(lo)
+          }
+        })
+
+        const allNotifications = [...pendingAppsList, ...mergedOrders]
+        allNotifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+        setNotifications(allNotifications)
+        setNotificationsCount(allNotifications.length)
+      } catch (err) {
+        console.error('Erro ao buscar notificações pendentes:', err)
+      }
+    }
+
+    fetchPendingNotifications()
+    const interval = setInterval(fetchPendingNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [barbershop])
 
   // toggleTheme is consumed from global theme context
 
@@ -311,15 +416,84 @@ export default function DashboardLayout({ children }) {
                   {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
                 </button>
 
-                {/* Notifications */}
-                <div className="relative">
-                  <button className={`p-2 rounded-xl border transition-all ${styles.iconButton}`}>
-                    <Bell size={15} />
-                  </button>
-                  {notificationsCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full border border-black animate-pulse" />
-                  )}
-                </div>
+                 {/* Notifications */}
+                 <div className="relative">
+                   <button 
+                     onClick={() => setDropdownOpen(!dropdownOpen)}
+                     className={`p-2 rounded-xl border transition-all ${styles.iconButton} ${dropdownOpen ? 'border-amber-500 bg-amber-500/5 text-amber-500' : ''}`}
+                     title="Notificações"
+                   >
+                     <Bell size={15} />
+                   </button>
+                   {notificationsCount > 0 && (
+                     <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full border border-black animate-pulse" />
+                   )}
+
+                   {/* Dropdown list */}
+                   <AnimatePresence>
+                     {dropdownOpen && (
+                       <>
+                         {/* Backdrop overlay for closing */}
+                         <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                         
+                         <motion.div
+                           initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                           animate={{ opacity: 1, y: 0, scale: 1 }}
+                           exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                           transition={{ duration: 0.15 }}
+                           className={`absolute right-0 mt-2 w-80 border rounded-2xl shadow-xl overflow-hidden z-50 flex flex-col ${
+                             isDark ? 'bg-[#09090b] border-zinc-900 text-white' : 'bg-white border-zinc-250 text-zinc-800'
+                           }`}
+                         >
+                           <div className={`p-4 border-b flex items-center justify-between ${styles.sidebarBorder}`}>
+                             <span className="text-xs font-extrabold uppercase tracking-widest text-zinc-400">Notificações</span>
+                             {notificationsCount > 0 && (
+                               <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-black bg-gradient-to-r from-amber-500 to-yellow-500">
+                                 {notificationsCount} Pendentes
+                               </span>
+                             )}
+                           </div>
+                           
+                           <div className="max-h-64 overflow-y-auto divide-y divide-zinc-900/50">
+                             {notifications.length === 0 ? (
+                               <div className="p-8 text-center flex flex-col items-center justify-center gap-2">
+                                 <Bell size={20} className="text-zinc-650" />
+                                 <p className="text-[10px] text-zinc-500">Nenhuma notificação pendente</p>
+                               </div>
+                             ) : (
+                               notifications.map(notif => (
+                                 <Link
+                                   key={notif.id}
+                                   href={notif.link}
+                                   onClick={() => setDropdownOpen(false)}
+                                   className={`p-3.5 flex flex-col gap-1 transition-all text-left block ${
+                                     isDark ? 'hover:bg-zinc-900/40 border-zinc-900/20' : 'hover:bg-zinc-50 border-zinc-100'
+                                   }`}
+                                 >
+                                   <div className="flex items-center justify-between">
+                                     <span className="text-[10px] font-extrabold text-amber-500 uppercase tracking-wider">
+                                       {notif.title}
+                                     </span>
+                                     <span className="text-[8px] text-zinc-500">
+                                       {new Date(notif.created_at).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }).split(' ')[1]}
+                                     </span>
+                                   </div>
+                                   <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-350' : 'text-zinc-650'}`}>
+                                     {notif.description}
+                                   </p>
+                                 </Link>
+                               ))
+                             )}
+                           </div>
+                           
+                           <div className={`p-2 bg-zinc-950/20 border-t text-center ${styles.sidebarBorder}`}>
+                             <span className="text-[9px] text-zinc-500 font-light">Clique para ver detalhes no painel</span>
+                           </div>
+                         </motion.div>
+                       </>
+                     )}
+                   </AnimatePresence>
+                 </div>
 
                 {/* Quick Action Button */}
                 <Link

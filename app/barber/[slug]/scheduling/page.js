@@ -173,50 +173,69 @@ export default function SchedulingPage() {
       setBookedSlots(bookedData || [])
 
       let productsList = productsResult?.data || []
-      if (!productsResult?.data || productsResult.error) {
+      if (!productsResult?.data || productsResult.error || productsList.length === 0) {
         console.warn('Produtos indisponíveis no banco, ativando fallback local.')
-        productsList = [
-          {
-            id: 'mock-p1',
-            name: 'Shampoo Carbon Cabelo & Barba',
-            brand: 'L\'Oréal Men Expert',
-            volume_ml: 250,
-            price: 59.90,
-            description: 'Shampoo purificante enriquecido com carvão ativado. Limpa profundamente e elimina impurezas da fibra capilar e dos fios da barba.',
-            photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop',
-            active: true
-          },
-          {
-            id: 'mock-p2',
-            name: 'Condicionador Hidratante Silk',
-            brand: 'Keune Haircosmetics',
-            volume_ml: 200,
-            price: 49.90,
-            description: 'Condicionador de nutrição profunda. Deixa os fios macios, maleáveis e fáceis de pentear, com brilho natural incomparável.',
-            photo_url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?q=80&w=600&auto=format&fit=crop',
-            active: true
-          },
-          {
-            id: 'mock-p3',
-            name: 'Pomada Matte Modeladora Strong',
-            brand: 'Redken Brews',
-            volume_ml: 100,
-            price: 79.90,
-            description: 'Pomada modeladora com fixação forte e acabamento matte opaco. Ideal para penteados estruturados com aspecto natural.',
-            photo_url: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?q=80&w=600&auto=format&fit=crop',
-            active: true
-          },
-          {
-            id: 'mock-p4',
-            name: 'Óleo de Barba Maciez Suprema',
-            brand: 'Beard Alchemist',
-            volume_ml: 50,
-            price: 39.90,
-            description: 'Blend de óleos essenciais hidratantes para barbas longas e ressecadas. Amacia instantaneamente os pelos rebeldes.',
-            photo_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=600&auto=format&fit=crop',
-            active: true
+        let savedLocalProducts = []
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem(`mock_products_${shopData.slug}`)
+          if (saved) {
+            try {
+              savedLocalProducts = JSON.parse(saved)
+            } catch (e) {
+              console.error('Erro ao ler mock_products:', e)
+            }
           }
-        ]
+        }
+
+        if (savedLocalProducts.length > 0) {
+          productsList = savedLocalProducts
+        } else {
+          productsList = [
+            {
+              id: 'mock-1',
+              name: 'Shampoo Carbon Cabelo & Barba',
+              brand: 'L\'Oréal Men Expert',
+              volume_ml: 250,
+              price: 59.90,
+              description: 'Shampoo purificante enriquecido com carvão ativado. Limpa profundamente e elimina impurezas da fibra capilar e dos fios da barba.',
+              photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop',
+              active: true
+            },
+            {
+              id: 'mock-2',
+              name: 'Condicionador Hidratante Silk',
+              brand: 'Keune Haircosmetics',
+              volume_ml: 200,
+              price: 49.90,
+              description: 'Condicionador de nutrição profunda. Deixa os fios macios, maleáveis e fáceis de pentear, com brilho natural incomparável.',
+              photo_url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?q=80&w=600&auto=format&fit=crop',
+              active: true
+            },
+            {
+              id: 'mock-3',
+              name: 'Pomada Matte Modeladora Strong',
+              brand: 'Redken Brews',
+              volume_ml: 100,
+              price: 79.90,
+              description: 'Pomada modeladora com fixação forte e acabamento matte opaco. Ideal para penteados estruturados com aspect natural.',
+              photo_url: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?q=80&w=600&auto=format&fit=crop',
+              active: true
+            },
+            {
+              id: 'mock-4',
+              name: 'Óleo de Barba Maciez Suprema',
+              brand: 'Beard Alchemist',
+              volume_ml: 50,
+              price: 39.90,
+              description: 'Blend de óleos essenciais hidratantes para barbas longas e ressecadas. Amacia instantaneamente os pelos rebeldes.',
+              photo_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=600&auto=format&fit=crop',
+              active: true
+            }
+          ]
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`mock_products_${shopData.slug}`, JSON.stringify(productsList))
+          }
+        }
       }
       setProducts(productsList)
 
