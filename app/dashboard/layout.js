@@ -28,22 +28,28 @@ export default function DashboardRootLayout({ children }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
+        // Garante que a sessão local está ativa (dispara auto-refresh do token se necessário)
         const { data: { session: currentSession } } = await supabase.auth.getSession()
-        if (!currentSession) {
+
+        // Em seguida, valida de forma segura a integridade do usuário no servidor do Supabase
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
           router.push('/login')
           return
         }
+
         setSession(currentSession)
 
         const { data: shopData } = await supabase
           .from('barbershops')
           .select('*')
-          .eq('user_id', currentSession.user.id)
+          .eq('user_id', user.id)
           .single()
 
         setBarbershop(shopData)
       } catch (err) {
         console.error('Erro ao carregar sessão no layout:', err)
+        router.push('/login')
       } finally {
         setLoading(false)
       }

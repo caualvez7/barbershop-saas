@@ -85,14 +85,14 @@ export default function ProductsPage() {
         console.warn('Erro ao carregar produtos (tabela pode não existir):', productsError.message)
         setDatabaseWarning(true)
         // Modo fallback local
-        loadMockData(shop.id, shop.slug)
+        loadMockData(barbershop.id, barbershop.slug)
       } else {
         setProducts(productsData || [])
         
         // Carrega pedidos simulados locais do localStorage
         let savedLocalOrders = []
         if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`mock_orders_${shop.slug}`)
+          const saved = localStorage.getItem(`mock_orders_${barbershop.slug}`)
           if (saved) {
             try {
               savedLocalOrders = JSON.parse(saved)
@@ -106,7 +106,7 @@ export default function ProductsPage() {
         const { data: salesData, error: salesError } = await supabase
           .from('product_sales')
           .select('*')
-          .eq('barbershop_id', shop.id)
+          .eq('barbershop_id', barbershop.id)
           .order('created_at', { ascending: false })
 
         if (!salesError && salesData && salesData.length > 0) {
