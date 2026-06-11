@@ -2,98 +2,49 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../../lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  Users, 
+  Scissors, 
+  CreditCard, 
+  Settings, 
+  Search, 
+  Bell, 
+  LogOut, 
+  Globe, 
+  Menu, 
+  X, 
+  ChevronLeft, 
+  Plus, 
+  BarChart3,
+  Moon,
+  Sun,
+  ShoppingBag
+} from 'lucide-react'
 
+// --- THEME CONTEXT ---
+export const ThemeContext = createContext({
+  theme: 'dark',
+  toggleTheme: () => {}
+})
 
+export function useTheme() {
+  return useContext(ThemeContext)
+}
 
-const navItems = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/barbers',
-    label: 'Barbeiros',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/services',
-    label: 'Serviços',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/appointments',
-    label: 'Agendamentos',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/plans',
-    label: 'Planos',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="4" width="22" height="16" rx="2" />
-        <line x1="1" y1="10" x2="23" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/settings',
-    label: 'Configurações',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
-]
+// --- DASHBOARD CONTEXT ---
+export const DashboardContext = createContext({
+  session: null,
+  barbershop: null,
+  loading: true
+})
 
-// ícone toggle igual à imagem enviada
-function SidebarToggleIcon({ collapsed }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="18" rx="4" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-      {collapsed ? (
-        <>
-          <circle cx="5" cy="8" r="0.8" fill="currentColor" stroke="none" />
-          <circle cx="5" cy="12" r="0.8" fill="currentColor" stroke="none" />
-        </>
-      ) : (
-        <>
-          <circle cx="5" cy="8" r="0.8" fill="currentColor" stroke="none" />
-          <circle cx="5" cy="12" r="0.8" fill="currentColor" stroke="none" />
-        </>
-      )}
-    </svg>
-  )
+export function useDashboard() {
+  return useContext(DashboardContext)
 }
 
 export default function DashboardLayout({ children }) {
@@ -101,140 +52,412 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [notificationsCount, setNotificationsCount] = useState(3)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { theme, toggleTheme } = useTheme()
+  const { barbershop, loading: checkingAuth } = useDashboard()
 
-      useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth < 768)
-        check()
-        window.addEventListener('resize', check)
-        return () => window.removeEventListener('resize', check)
-      }, [])
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // toggleTheme is consumed from global theme context
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
+  const isDark = theme === 'dark'
+
+  const styles = {
+    bg: isDark ? 'bg-[#030303] text-zinc-100' : 'bg-[#fafaf9] text-zinc-800',
+    sidebar: isDark ? 'bg-[#09090b]/40 border-zinc-900/60 backdrop-blur-xl' : 'bg-white border-zinc-200/80 shadow-sm',
+    sidebarBorder: isDark ? 'border-zinc-900/60' : 'border-zinc-200/80',
+    navLinkActive: 'bg-gradient-to-r text-amber-500 font-bold border-l-2 border-amber-500',
+    navLinkActiveBg: isDark ? 'from-amber-500/10 to-yellow-500/5 border-amber-500/20' : 'from-amber-500/5 to-yellow-500/5 border-amber-500/10 shadow-sm',
+    navLinkInactive: isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/30' : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100/60',
+    profileFooter: isDark ? 'border-zinc-900/60 bg-zinc-950/20' : 'border-zinc-200/80 bg-zinc-50/80',
+    profileFooterName: isDark ? 'text-zinc-200' : 'text-zinc-800',
+    profileFooterPlan: isDark ? 'text-zinc-500' : 'text-zinc-400',
+    profileButton: isDark ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10' : 'text-zinc-400 hover:text-red-600 hover:bg-red-50',
+    topnav: isDark ? 'border-zinc-900/60 bg-[#030303]/70' : 'border-zinc-200/80 bg-[#fafaf9]/80',
+    searchInput: isDark ? 'bg-zinc-900/30 border-zinc-900 hover:border-zinc-800 text-zinc-300' : 'bg-zinc-200/40 border-zinc-200 hover:border-zinc-300/80 text-zinc-800 placeholder-zinc-400',
+    searchBadge: isDark ? 'bg-zinc-900 text-zinc-500 border-zinc-800' : 'bg-zinc-200 text-zinc-400 border-zinc-200/60',
+    iconButton: isDark ? 'text-zinc-400 hover:text-zinc-200 bg-zinc-950/40 border-zinc-900 hover:border-zinc-800/80' : 'text-zinc-600 hover:text-zinc-900 bg-white border-zinc-200/80 hover:bg-zinc-50',
+    quickActionButton: 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold shadow-[0_0_15px_rgba(245,158,11,0.25)]',
+    avatarContainer: 'bg-gradient-to-tr from-amber-500 via-yellow-500 to-amber-600 p-[1px]',
+    avatarInner: isDark ? 'bg-[#09090b] text-zinc-200' : 'bg-white text-zinc-800',
+    mobileTabBar: isDark ? 'bg-[#09090b]/85 border-zinc-900/60' : 'bg-white/95 border-zinc-200/80',
+    mobileTabLinkActive: 'text-amber-500',
+    mobileTabLinkInactive: isDark ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-400 hover:text-zinc-700',
+    drawer: isDark ? 'bg-[#09090b] border-zinc-900' : 'bg-white border-zinc-200/80',
+    drawerLinkActive: 'bg-amber-500/10 text-amber-500 border-l-2 border-amber-500',
+    drawerLinkInactive: isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900',
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#030303] flex flex-col items-center justify-center gap-4">
+        <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+        <p className="text-zinc-500 text-xs font-mono tracking-wider uppercase">
+          Verificando sessão...
+        </p>
+      </div>
+    )
+  }
+
+  const navItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/dashboard/appointments', label: 'Agendamentos', icon: Calendar },
+    { href: '/dashboard/customers', label: 'Clientes', icon: Users },
+    { href: '/dashboard/services', label: 'Serviços', icon: Scissors },
+    { href: '/dashboard/barbers', label: 'Barbeiros', icon: Users },
+    { href: '/dashboard/plans', label: 'Planos', icon: CreditCard },
+    { href: '/dashboard/products', label: 'Produtos', icon: ShoppingBag },
+    { href: '/dashboard/reports', label: 'Relatórios', icon: BarChart3, disabled: false },
+    { href: barbershop ? `/barber/${barbershop.slug}` : '#', label: 'Página Pública', icon: Globe, external: true },
+    { href: '/dashboard/settings', label: 'Configurações', icon: Settings },
+  ]
+
+  const mobileTabItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/dashboard/appointments', label: 'Agenda', icon: Calendar },
+    { href: '/dashboard/services', label: 'Serviços', icon: Scissors },
+    { href: '/dashboard/barbers', label: 'Barbeiros', icon: Users },
+    { href: '/dashboard/settings', label: 'Ajustes', icon: Settings },
+  ]
+
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Sans', sans-serif; background: #fafaf9; color: #1a1a18; }
-        .nav-link {
-          display: flex;
-          align-items: center;
-          gap: 0.65rem;
-          padding: 0.5rem 0.85rem;
-          border-radius: 10px;
-          font-size: 0.875rem;
-          color: #6b6b67;
-          text-decoration: none;
-          transition: all .15s;
-          font-weight: 400;
-          white-space: nowrap;
-          overflow: hidden;
-        }
-        .nav-link:hover { background: #f5f4f0; color: #1a1a18; }
-        .nav-link.active { background: #f5f4f0; color: #1a1a18; font-weight: 500; }
-        .nav-link .nav-label {
-          transition: opacity .2s, width .2s;
-        }
-        .sidebar { transition: width .2s ease; overflow: hidden; }
-        .toggle-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #6b6b67;
-          padding: 0.25rem;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: color .15s, background .15s;
-        }
-        .toggle-btn:hover { color: #1a1a18; background: #f5f4f0; }
-      `}</style>
+    <div className={`min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200 transition-colors duration-300 ${styles.bg}`}>
+        
+        {/* Decorative Blur Backgrounds (only visible in dark mode to preserve contrast) */}
+        {isDark && (
+          <>
+            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/[0.03] rounded-full blur-[140px] pointer-events-none z-0" />
+            <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-yellow-500/[0.02] rounded-full blur-[120px] pointer-events-none z-0" />
+          </>
+        )}
 
-      <div style={{ minHeight: '100vh', background: '#fafaf9', display: 'flex', flexDirection: 'column' }}>
-
-        {/* HEADER */}
-        <header style={{
-          height: '60px', borderBottom: '0.5px solid #e5e3dd',
-          background: 'rgba(250,250,249,0.92)', backdropFilter: 'blur(12px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 1.75rem', position: 'sticky', top: 0, zIndex: 100,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-
-            <Link href="/" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.2rem', color: '#1a1a18', textDecoration: 'none', letterSpacing: '-0.01em' }}>
-              Barber<span style={{ color: '#2563eb' }}>ShopBR</span>
-            </Link>
-
-          </div>
-
-          <button
-            onClick={handleLogout}
-            style={{ background: 'none', border: 'none', fontSize: '0.875rem', color: '#6b6b67', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'color .2s' }}
-            onMouseEnter={e => e.target.style.color = '#1a1a18'}
-            onMouseLeave={e => e.target.style.color = '#6b6b67'}
+        <div className="flex flex-1 relative overflow-hidden z-10">
+          
+          {/* SIDEBAR (Desktop) */}
+          <aside 
+            className={`hidden md:flex flex-col border-r transition-all duration-300 relative overflow-hidden ${styles.sidebar} ${
+              collapsed ? 'w-[78px]' : 'w-[260px]'
+            }`}
           >
-            Sair
-          </button>
-        </header>
+            {/* Sidebar Glow Header Accent (Dark mode only) */}
+            {isDark && (
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-500/10 to-transparent" />
+            )}
 
-        <div style={{ display: 'flex', flex: 1 }}>
-
-          {/* SIDEBAR */}
-          <aside
-            className="sidebar"
-              style={{
-                display: isMobile ? 'none' : 'flex',
-                width: isMobile ? '0px' : collapsed ? '60px' : '220px',
-                borderRight: isMobile ? 'none' : '0.5px solid #e5e3dd',
-                background: '#fff',
-                padding: collapsed ? '1.5rem 0.5rem' : '1.5rem 1rem',
-                flexDirection: 'column',
-                gap: '0.25rem',
-                position: 'sticky',
-                top: '60px',
-                height: 'calc(100vh - 60px)',
-                overflowY: 'auto',
-                overflowX: 'hidden',
-              }}
-          >
-              {/* TOGGLE */}
-              {!isMobile && (
-                <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', marginBottom: '0.75rem' }}>
-                  <button className="toggle-btn" onClick={() => setCollapsed(!collapsed)}>
-                    <SidebarToggleIcon collapsed={collapsed} />
-                  </button>
+            {/* Brand Header */}
+            <div className={`h-16 flex items-center justify-between px-5 border-b ${styles.sidebarBorder}`}>
+              <Link href="/dashboard" className="flex items-center gap-2.5 group">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-500 flex items-center justify-center text-sm font-bold text-black shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                  B
                 </div>
+                {!collapsed && (
+                  <span className={`font-bold tracking-tight text-lg transition-all duration-300 ${
+                    isDark 
+                      ? 'bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent group-hover:via-amber-200' 
+                      : 'text-zinc-900 group-hover:text-amber-600'
+                  }`}>
+                    Barber<span className="text-amber-500">Shop</span>
+                  </span>
+                )}
+              </Link>
+              {!collapsed && (
+                <button 
+                  onClick={() => setCollapsed(true)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    isDark ? 'text-zinc-500 hover:text-white hover:bg-zinc-900/50' : 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100'
+                  }`}
+                >
+                  <ChevronLeft size={16} />
+                </button>
               )}
+            </div>
+
+            {/* Navigation Links */}
+            <div className="flex-1 py-4 px-3 flex flex-col gap-1 overflow-y-auto scrollbar-none">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all relative group ${
+                      item.disabled ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+                    } ${isActive ? styles.navLinkActive : styles.navLinkInactive}`}
+                  >
+                    {/* Active Background Slide Effect */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebar-active-bg"
+                        className={`absolute inset-0 bg-gradient-to-r border rounded-xl -z-10 ${styles.navLinkActiveBg}`}
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    {isActive && (
+                      <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-amber-500" />
+                    )}
+
+                    <Icon size={18} className={`flex-shrink-0 transition-colors duration-300 ${isActive ? 'text-amber-500' : 'text-zinc-400 group-hover:text-amber-500'}`} />
+                    
+                    {!collapsed && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+
+                    {/* Tooltip for collapsed view */}
+                    {collapsed && (
+                      <div className={`absolute left-[85px] border px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-xl z-50 ${
+                        isDark ? 'bg-[#0c0c0e] border-zinc-800 text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'
+                      }`}>
+                        {item.label}
+                      </div>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* User Profile Footer */}
+            <div className={`p-4 border-t ${styles.profileFooter}`}>
+              <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-700 flex items-center justify-center text-xs font-bold text-white border border-amber-400/20 shadow-md flex-shrink-0">
+                    {barbershop?.name ? barbershop.name.charAt(0) : 'A'}
+                  </div>
+                  {!collapsed && (
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold truncate leading-tight ${styles.profileFooterName}`}>
+                        {barbershop?.name || 'Carregando...'}
+                      </p>
+                      <p className={`text-[10px] font-mono tracking-wider uppercase leading-none mt-0.5 ${styles.profileFooterPlan}`}>
+                        {barbershop?.plan === 'premium' ? 'Plano VIP' : 'Plano Básico'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {!collapsed && (
+                  <button 
+                    onClick={handleLogout}
+                    className={`p-1.5 rounded-lg transition-all duration-200 ${styles.profileButton}`}
+                    title="Sair do painel"
+                  >
+                    <LogOut size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* MAIN PANEL */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
             
-            {navItems.map(item => (
+            {/* TOPNAV */}
+            <header className={`h-16 border-b flex items-center justify-between px-6 z-40 backdrop-blur-md ${styles.topnav}`}>
+              <div className="flex items-center gap-4">
+                {/* Expand Sidebar Trigger when Collapsed */}
+                {collapsed && (
+                  <button 
+                    onClick={() => setCollapsed(false)}
+                    className={`hidden md:flex p-1 rounded-lg transition-colors ${
+                      isDark ? 'text-zinc-500 hover:text-white hover:bg-zinc-900/50' : 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <Menu size={18} />
+                  </button>
+                )}
+                {/* Mobile Menu Trigger */}
+                <button 
+                  onClick={() => setMobileMenuOpen(true)}
+                  className={`md:hidden p-1 rounded-lg transition-colors ${
+                    isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-900/50' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100'
+                  }`}
+                >
+                  <Menu size={20} />
+                </button>
+
+                {/* Global Search */}
+                <div className="relative hidden sm:block">
+                  <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                  <input 
+                    type="text" 
+                    placeholder="Pesquisar..." 
+                    className={`border rounded-xl pl-9 pr-14 py-1.5 text-xs w-56 focus:w-72 outline-none transition-all duration-300 ${styles.searchInput}`}
+                  />
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 border text-[9px] px-1.5 py-0.5 rounded font-mono pointer-events-none ${styles.searchBadge}`}>
+                    ⌘K
+                  </span>
+                </div>
+              </div>
+
+              {/* Topnav Actions */}
+              <div className="flex items-center gap-4">
+                
+                {/* Theme Toggle Button */}
+                <button 
+                  onClick={toggleTheme}
+                  className={`p-2 rounded-xl border transition-all ${styles.iconButton}`}
+                  title={isDark ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+                >
+                  {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
+                </button>
+
+                {/* Notifications */}
+                <div className="relative">
+                  <button className={`p-2 rounded-xl border transition-all ${styles.iconButton}`}>
+                    <Bell size={15} />
+                  </button>
+                  {notificationsCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full border border-black animate-pulse" />
+                  )}
+                </div>
+
+                {/* Quick Action Button */}
+                <Link
+                  href="/dashboard/services"
+                  className={`hidden sm:flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl transition-all duration-300 hover:scale-[1.02] ${styles.quickActionButton}`}
+                >
+                  <Plus size={14} />
+                  <span>Novo Serviço</span>
+                </Link>
+
+                {/* User profile avatar */}
+                <div className={`w-8 h-8 rounded-xl cursor-pointer ${styles.avatarContainer}`}>
+                  <div className={`w-full h-full rounded-[11px] flex items-center justify-center text-xs font-semibold ${styles.avatarInner}`}>
+                    {barbershop?.name ? barbershop.name.charAt(0) : 'A'}
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* MAIN PAGE VIEW (Scrollable) */}
+            <main className="flex-1 overflow-y-auto p-5 md:p-8 pb-24 md:pb-8">
+              {children}
+            </main>
+          </div>
+        </div>
+
+        {/* MOBILE BOTTOM NAVIGATION TAB BAR */}
+        <nav className={`fixed bottom-0 left-0 right-0 h-16 backdrop-blur-xl border-t flex justify-around items-center z-40 md:hidden pb-1 px-2 ${styles.mobileTabBar}`}>
+          {mobileTabItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href
+            return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-link ${pathname === item.href ? 'active' : ''}`}
-                style={{ justifyContent: collapsed ? 'center' : 'flex-start', padding: collapsed ? '0.6rem' : '0.5rem 0.85rem' }}
-                title={collapsed ? item.label : undefined}
+                className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors ${
+                  isActive ? styles.mobileTabLinkActive : styles.mobileTabLinkInactive
+                }`}
               >
-                <span style={{ flexShrink: 0 }}>{item.icon}</span>
-                {!collapsed && (
-                  <span className="nav-label">{item.label}</span>
-                )}
+                <div className="relative">
+                  <Icon size={18} />
+                  {isActive && (
+                    <motion.div 
+                      layoutId="mobile-tab-dot" 
+                      className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-amber-500 rounded-full"
+                    />
+                  )}
+                </div>
+                <span className="text-[9px] font-medium tracking-tight">{item.label}</span>
               </Link>
-            ))}
-          </aside>
+            )
+          })}
+        </nav>
 
-          {/* CONTEÚDO */}
-          <main style={{ flex: 1, padding: '2rem', maxWidth: '100%', overflowX: 'hidden', paddingBottom: isMobile ? '80px' : '2rem', }}>
-            {children}
-          </main>
+        {/* MOBILE DRAWER MENU OVERLAY */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setMobileMenuOpen(false)}
+                className="fixed inset-0 bg-black z-50 md:hidden"
+              />
+              {/* Drawer */}
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className={`fixed top-0 bottom-0 left-0 w-64 border-r z-50 md:hidden flex flex-col p-6 shadow-2xl ${styles.drawer}`}
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <span className="font-bold text-lg bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
+                    BarberShopBR
+                  </span>
+                  <button 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`p-1 rounded-lg ${
+                      isDark ? 'text-zinc-500 hover:text-white hover:bg-zinc-900' : 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
 
-        </div>
-         
+                {/* Drawer items */}
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto">
+                  {navItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                          item.disabled ? 'opacity-35 pointer-events-none' : ''
+                        } ${
+                          isActive ? styles.drawerLinkActive : styles.drawerLinkInactive
+                        }`}
+                      >
+                        <Icon size={16} />
+                        <span>{item.label}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+
+                {/* Drawer footer profile */}
+                <div className={`border-t pt-4 flex items-center justify-between mt-auto ${isDark ? 'border-zinc-900' : 'border-zinc-200'}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-700 flex items-center justify-center text-xs font-bold text-white border border-amber-400/20 flex-shrink-0">
+                      {barbershop?.name ? barbershop.name.charAt(0) : 'A'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold truncate leading-tight ${styles.profileFooterName}`}>
+                        {barbershop?.name || 'Minha Barbearia'}
+                      </p>
+                      <p className={`text-[10px] mt-0.5 ${styles.profileFooterPlan}`}>
+                        {barbershop?.plan === 'premium' ? 'Plano VIP' : 'Plano Básico'}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className={`p-1.5 rounded-lg ${styles.profileButton}`}
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
       </div>
-    </>
   )
 }

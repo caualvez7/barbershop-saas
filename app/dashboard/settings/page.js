@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
-import DashboardLayout from '../../components/DashboardLayout'
+import { useRouter } from 'next/navigation'
+import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Settings, Save, CheckCircle2, Clock, MapPin, Store } from 'lucide-react'
 
 const DAYS = [
   { value: 0, label: 'Domingo' },
@@ -15,6 +18,11 @@ const DAYS = [
 ]
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
+  const { barbershop: initialBarbershop } = useDashboard()
   const [barbershop, setBarbershop] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,39 +41,39 @@ export default function SettingsPage() {
     DAYS.map(d => ({ day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }))
   )
 
-  const loadData = async () => {
-    await supabase.auth.refreshSession()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  useEffect(() => {
+    if (!initialBarbershop) return
 
-    const { data: shop } = await supabase
-      .from('barbershops').select('*').eq('user_id', user.id).single()
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setBarbershop(initialBarbershop)
+        setName(initialBarbershop.name || '')
+        setOwnerName(initialBarbershop.owner_name || '')
+        setPhone(initialBarbershop.phone || '')
+        setCommercialEmail(initialBarbershop.commercial_email || '')
 
-    if (!shop) return
-    setBarbershop(shop)
-    setName(shop.name || '')
-    setOwnerName(shop.owner_name || '')
-    setPhone(shop.phone || '')
-    setCommercialEmail(shop.commercial_email || '')
+        const { data: hoursData } = await supabase
+          .from('business_hours')
+          .select('*')
+          .eq('barbershop_id', initialBarbershop.id)
 
-    const { data: hoursData } = await supabase
-      .from('business_hours')
-      .select('*')
-      .eq('barbershop_id', shop.id)
-
-    if (hoursData && hoursData.length > 0) {
-      setHours(DAYS.map(d => {
-        const existing = hoursData.find(h => h.day_of_week === d.value)
-        return existing
-          ? { day_of_week: d.value, is_open: existing.is_open, open_time: existing.open_time, close_time: existing.close_time }
-          : { day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }
-      }))
+        if (hoursData && hoursData.length > 0) {
+          setHours(DAYS.map(d => {
+            const existing = hoursData.find(h => h.day_of_week === d.value)
+            return existing
+              ? { day_of_week: d.value, is_open: existing.is_open, open_time: existing.open_time.slice(0, 5), close_time: existing.close_time.slice(0, 5) }
+              : { day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }
+          }))
+        }
+      } catch (err) {
+        console.error('Erro ao carregar configurações:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-
-    setLoading(false)
-  }
-
-  useEffect(() => { loadData() }, [])
+    loadData()
+  }, [initialBarbershop])
 
   const updateHour = (dayValue, field, value) => {
     setHours(prev => prev.map(h =>
@@ -80,10 +88,14 @@ export default function SettingsPage() {
 
     const { error } = await supabase
       .from('barbershops')
-      .update({ name, owner_name: ownerName, phone, commercial_email: commercialEmail })
+      .update({ name: name.trim(), owner_name: ownerName.trim(), phone: phone.trim(), commercial_email: commercialEmail.trim() })
       .eq('id', barbershop.id)
 
-    if (error) { alert('Erro ao salvar informações.'); setSaving(false); return }
+    if (error) { 
+      alert('Erro ao salvar informações.')
+      setSaving(false)
+      return 
+    }
 
     setSuccessInfo(true)
     setTimeout(() => setSuccessInfo(false), 3000)
@@ -93,184 +105,253 @@ export default function SettingsPage() {
   const handleSaveHours = async () => {
     setSavingHours(true)
 
-    // upsert — insere ou atualiza cada dia
     const rows = hours.map(h => ({
       barbershop_id: barbershop.id,
       day_of_week: h.day_of_week,
       is_open: h.is_open,
-      open_time: h.open_time,
-      close_time: h.close_time,
+      open_time: h.open_time + ':00',
+      close_time: h.close_time + ':00',
     }))
 
     const { error } = await supabase
       .from('business_hours')
       .upsert(rows, { onConflict: 'barbershop_id,day_of_week' })
 
-    if (error) { alert('Erro ao salvar horários.'); setSavingHours(false); return }
+    if (error) { 
+      alert('Erro ao salvar horários.')
+      setSavingHours(false)
+      return 
+    }
 
     setSuccessHours(true)
     setTimeout(() => setSuccessHours(false), 3000)
     setSavingHours(false)
   }
 
-  const inputStyle = {
-    width: '100%', border: '0.5px solid #e5e3dd', borderRadius: '12px',
-    padding: '0.75rem 1rem', fontSize: '0.9rem', fontFamily: "'DM Sans', sans-serif",
-    color: '#1a1a18', background: '#fff', outline: 'none', transition: 'border-color .2s',
+  const styles = {
+    card: isDark 
+      ? 'border-zinc-900 bg-[#0c0c0e]/50 backdrop-blur-xl shadow-xl' 
+      : 'border-zinc-200/80 bg-white shadow-md',
+    input: isDark 
+      ? 'bg-zinc-900/30 border-zinc-900 focus:border-zinc-800 text-zinc-200 placeholder-zinc-500' 
+      : 'bg-white border-zinc-200 focus:border-zinc-300 text-zinc-900 placeholder-zinc-400 shadow-sm',
+    timeInput: isDark
+      ? 'bg-zinc-950 border-zinc-900 text-zinc-200'
+      : 'bg-zinc-50 border-zinc-200 text-zinc-800 shadow-inner',
+    button: 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)]',
+    hoursRow: (isOpen) => {
+      if (isOpen) {
+        return isDark
+          ? 'border-amber-500/35 bg-amber-500/[0.04]'
+          : 'border-amber-500 bg-amber-50/30 shadow-sm'
+      }
+      return isDark
+        ? 'border-zinc-900 bg-zinc-950/20'
+        : 'border-zinc-200 bg-white'
+    }
   }
 
-  const timeInputStyle = {
-    border: '0.5px solid #e5e3dd', borderRadius: '8px',
-    padding: '0.4rem 0.6rem', fontSize: '0.825rem', fontFamily: "'DM Sans', sans-serif",
-    color: '#1a1a18', background: '#fff', outline: 'none', width: '90px',
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+          <div className="h-10 w-48 bg-zinc-900/60 animate-pulse rounded-lg" />
+          <div className="h-64 bg-[#0c0c0e]/40 border border-zinc-900 rounded-2xl animate-pulse" />
+          <div className="h-96 bg-[#0c0c0e]/40 border border-zinc-900 rounded-2xl animate-pulse" />
+        </div>
+      </DashboardLayout>
+    )
   }
-
-  if (loading) return (
-    <DashboardLayout>
-      <p style={{ color: '#6b6b67', fontSize: '0.9rem' }}>Carregando...</p>
-    </DashboardLayout>
-  )
 
   return (
     <DashboardLayout>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', maxWidth: '620px' }}>
-
+      <div className="flex flex-col gap-6 max-w-2xl mx-auto pb-10">
+        
+        {/* CABEÇALHO */}
         <div>
-          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.75rem', fontWeight: 400, letterSpacing: '-0.02em', color: '#1a1a18', marginBottom: '0.25rem' }}>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'}`}>
             Configurações
           </h1>
-          <p style={{ fontSize: '0.875rem', color: '#6b6b67', fontWeight: 300 }}>
-            Gerencie as informações e funcionamento da sua barbearia.
+          <p className="text-zinc-500 text-xs mt-0.5">
+            Gerencie o perfil público, dados comerciais e o horário de funcionamento da barbearia.
           </p>
         </div>
 
-        {/* INFORMAÇÕES */}
-        <div style={{ background: '#fff', border: '0.5px solid #e5e3dd', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* INFORMAÇÕES BÁSICAS */}
+        <div className={`p-6 rounded-2xl border flex flex-col gap-5 ${styles.card}`}>
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <Store size={16} className="text-amber-500" />
+            <span className={isDark ? 'text-zinc-200' : 'text-zinc-800'}>Informações da Barbearia</span>
+          </div>
 
-          <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400, color: '#1a1a18' }}>
-            Informações da barbearia
-          </h2>
-
-          {[
-            { label: 'Nome da barbearia', value: name, set: setName, placeholder: 'Ex: Barbearia Master' },
-            { label: 'Nome do proprietário', value: ownerName, set: setOwnerName, placeholder: 'Ex: João Silva' },
-            { label: 'Telefone', value: phone, set: setPhone, placeholder: '(00) 00000-0000' },
-            { label: 'Email comercial', value: commercialEmail, set: setCommercialEmail, placeholder: 'contato@barbearia.com' },
-          ].map(field => (
-            <div key={field.label}>
-              <label style={{ fontSize: '0.825rem', color: '#6b6b67', display: 'block', marginBottom: '0.4rem' }}>{field.label}</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-500">Nome da Barbearia</label>
               <input
-                style={inputStyle}
-                placeholder={field.placeholder}
-                value={field.value}
-                onChange={e => field.set(e.target.value)}
-                onFocus={e => e.target.style.borderColor = '#2563eb'}
-                onBlur={e => e.target.style.borderColor = '#e5e3dd'}
+                type="text"
+                placeholder="Ex: Barbearia Master"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className={`px-4 py-2.5 text-xs rounded-xl border outline-none ${styles.input}`}
               />
             </div>
-          ))}
 
-          {successInfo && (
-            <div style={{ background: '#f0fdf4', border: '0.5px solid #86efac', borderRadius: '10px', padding: '0.65rem 1rem' }}>
-              <p style={{ fontSize: '0.825rem', color: '#16a34a' }}>✓ Informações salvas com sucesso.</p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-500">Nome do Proprietário</label>
+              <input
+                type="text"
+                placeholder="Ex: João Silva"
+                value={ownerName}
+                onChange={e => setOwnerName(e.target.value)}
+                className={`px-4 py-2.5 text-xs rounded-xl border outline-none ${styles.input}`}
+              />
             </div>
-          )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-500">Telefone</label>
+              <input
+                type="text"
+                placeholder="(00) 00000-0000"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className={`px-4 py-2.5 text-xs rounded-xl border outline-none ${styles.input}`}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase font-bold text-zinc-500">E-mail Comercial</label>
+              <input
+                type="email"
+                placeholder="contato@barbearia.com"
+                value={commercialEmail}
+                onChange={e => setCommercialEmail(e.target.value)}
+                className={`px-4 py-2.5 text-xs rounded-xl border outline-none ${styles.input}`}
+              />
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {successInfo && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="bg-emerald-500/10 border border-emerald-500/10 rounded-xl p-3 flex items-center gap-2"
+              >
+                <CheckCircle2 size={14} className="text-emerald-500" />
+                <span className="text-[11px] font-bold text-emerald-500">Configurações salvas com sucesso!</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button
             onClick={handleSaveInfo}
             disabled={saving}
-            style={{ background: '#1a1a18', color: '#fafaf9', border: 'none', padding: '0.85rem', borderRadius: '100px', fontSize: '0.875rem', fontFamily: "'DM Sans', sans-serif", cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.5 : 1 }}
+            className={`py-2.5 text-xs rounded-xl cursor-pointer flex items-center justify-center gap-1.5 ${styles.button} ${
+              saving ? 'opacity-55 cursor-not-allowed' : ''
+            }`}
           >
-            {saving ? 'Salvando...' : 'Salvar informações'}
+            <Save size={14} />
+            <span>{saving ? 'Salvando...' : 'Salvar Informações'}</span>
           </button>
-
         </div>
 
-        {/* HORÁRIOS */}
-        <div style={{ background: '#fff', border: '0.5px solid #e5e3dd', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-          <div>
-            <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400, color: '#1a1a18', marginBottom: '0.25rem' }}>
-              Horário de funcionamento
-            </h2>
-            <p style={{ fontSize: '0.825rem', color: '#6b6b67', fontWeight: 300 }}>
-              Ative os dias e defina o horário de abertura e fechamento.
-            </p>
+        {/* HORÁRIOS DE ATENDIMENTO */}
+        <div className={`p-6 rounded-2xl border flex flex-col gap-5 ${styles.card}`}>
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <Clock size={16} className="text-amber-500" />
+            <span className={isDark ? 'text-zinc-200' : 'text-zinc-800'}>Horário de Funcionamento</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <p className="text-zinc-500 text-xs">
+            Selecione quais dias da semana sua barbearia estará de portas abertas e configure a janela de agendamento.
+          </p>
+
+          <div className="flex flex-col gap-2">
             {DAYS.map(day => {
               const h = hours.find(x => x.day_of_week === day.value)
               return (
-                <div key={day.value} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '0.75rem 1rem', borderRadius: '12px', flexWrap: 'wrap', gap: '0.75rem',
-                  border: h.is_open ? '0.5px solid #2563eb' : '0.5px solid #e5e3dd',
-                  background: h.is_open ? '#eef2ff' : '#fff',
-                  transition: 'all .15s',
-                }}>
-
-                  {/* TOGGLE + NOME */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '140px' }}>
-                    <div
+                <div 
+                  key={day.value}
+                  className={`px-4 py-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-200 ${
+                    styles.hoursRow(h.is_open)
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    {/* CUSTOM ANIMATED TOGGLE */}
+                    <button
+                      type="button"
                       onClick={() => updateHour(day.value, 'is_open', !h.is_open)}
-                      style={{
-                        width: '36px', height: '20px', borderRadius: '100px', cursor: 'pointer',
-                        background: h.is_open ? '#2563eb' : '#e5e3dd',
-                        position: 'relative', transition: 'background .2s', flexShrink: 0,
-                      }}
+                      className={`w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer flex-shrink-0 ${
+                        h.is_open ? 'bg-amber-500' : 'bg-zinc-700/60 dark:bg-zinc-800'
+                      }`}
                     >
-                      <div style={{
-                        width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
-                        position: 'absolute', top: '3px', transition: 'left .2s',
-                        left: h.is_open ? '19px' : '3px',
-                      }} />
-                    </div>
-                    <span style={{ fontSize: '0.875rem', color: '#1a1a18', fontWeight: h.is_open ? 500 : 400 }}>
+                      <motion.div 
+                        animate={{ x: h.is_open ? 18 : 2 }}
+                        className="w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 left-0.5 shadow-sm"
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      />
+                    </button>
+
+                    <span className={`text-xs font-bold ${
+                      h.is_open 
+                        ? (isDark ? 'text-white' : 'text-zinc-900') 
+                        : (isDark ? 'text-zinc-500' : 'text-zinc-400')
+                    }`}>
                       {day.label}
                     </span>
                   </div>
 
-                  {/* HORÁRIOS */}
                   {h.is_open ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="flex items-center gap-2">
                       <input
                         type="time"
                         value={h.open_time}
                         onChange={e => updateHour(day.value, 'open_time', e.target.value)}
-                        style={timeInputStyle}
+                        className={`px-2 py-1 text-center text-xs font-bold font-mono rounded-lg border outline-none w-18 ${styles.timeInput}`}
                       />
-                      <span style={{ fontSize: '0.8rem', color: '#9e9c96' }}>até</span>
+                      <span className="text-[10px] text-zinc-500 font-bold">até</span>
                       <input
                         type="time"
                         value={h.close_time}
                         onChange={e => updateHour(day.value, 'close_time', e.target.value)}
-                        style={timeInputStyle}
+                        className={`px-2 py-1 text-center text-xs font-bold font-mono rounded-lg border outline-none w-18 ${styles.timeInput}`}
                       />
                     </div>
                   ) : (
-                    <span style={{ fontSize: '0.8rem', color: '#9e9c96' }}>Fechado</span>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-900/10 dark:bg-zinc-950/40 px-2 py-0.5 rounded border border-zinc-200/50 dark:border-zinc-900/60">
+                      Fechado
+                    </span>
                   )}
-
                 </div>
               )
             })}
           </div>
 
-          {successHours && (
-            <div style={{ background: '#f0fdf4', border: '0.5px solid #86efac', borderRadius: '10px', padding: '0.65rem 1rem' }}>
-              <p style={{ fontSize: '0.825rem', color: '#16a34a' }}>✓ Horários salvos com sucesso.</p>
-            </div>
-          )}
+          <AnimatePresence>
+            {successHours && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="bg-emerald-500/10 border border-emerald-500/10 rounded-xl p-3 flex items-center gap-2"
+              >
+                <CheckCircle2 size={14} className="text-emerald-500" />
+                <span className="text-[11px] font-bold text-emerald-500">Horários de funcionamento salvos com sucesso!</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button
             onClick={handleSaveHours}
             disabled={savingHours}
-            style={{ background: '#1a1a18', color: '#fafaf9', border: 'none', padding: '0.85rem', borderRadius: '100px', fontSize: '0.875rem', fontFamily: "'DM Sans', sans-serif", cursor: savingHours ? 'not-allowed' : 'pointer', opacity: savingHours ? 0.5 : 1 }}
+            className={`py-2.5 text-xs rounded-xl cursor-pointer flex items-center justify-center gap-1.5 ${styles.button} ${
+              savingHours ? 'opacity-55 cursor-not-allowed' : ''
+            }`}
           >
-            {savingHours ? 'Salvando...' : 'Salvar horários'}
+            <Save size={14} />
+            <span>{savingHours ? 'Salvando...' : 'Salvar Horários'}</span>
           </button>
-
         </div>
 
       </div>

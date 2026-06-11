@@ -1,0 +1,80 @@
+.star-border-container {
+  display: inline-block;
+  position: relative;
+  border-radius: 9999px; /* Totalmente arredondado tipo pílula */
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.star-border-container:hover {
+  transform: translateY(-2px);
+}
+
+.star-border-container:active {
+  transform: translateY(0);
+}
+
+.border-gradient-bottom {
+  position: absolute;
+  width: 300%;
+  height: 50%;
+  opacity: 0.85;
+  bottom: -12px;
+  right: -250%;
+  border-radius: 50%;
+  animation: star-movement-bottom linear infinite alternate;
+  z-index: 0;
+}
+
+.border-gradient-top {
+  position: absolute;
+  opacity: 0.85;
+  width: 300%;
+  height: 50%;
+  top: -12px;
+  left: -250%;
+  border-radius: 50%;
+  animation: star-movement-top linear infinite alternate;
+  z-index: 0;
+}
+
+.inner-content {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #09090b; /* zinc-950 para integrar com a landing page */
+  color: #d4d4d8; /* zinc-300 */
+  font-size: 14px; /* text-sm */
+  font-weight: 700; /* font-bold */
+  text-align: center;
+  padding: 14px 32px; /* py-3.5 px-8 para igualar a altura e largura do outro botão */
+  border-radius: 9999px; /* Totalmente arredondado tipo pílula */
+  z-index: 1;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.star-border-container:hover .inner-content {
+  color: #ffffff;
+  background: #18181b; /* zinc-900 no hover */
+}
+
+@keyframes star-movement-bottom {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-100%, 0%);
+    opacity: 0.4;
+  }
+}
+
+@keyframes star-movement-top {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(100%, 0%);
+    opacity: 0.4;
+  }
+}

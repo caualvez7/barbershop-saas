@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { Scissors, Sparkles, Mail, Lock, AlertCircle, ChevronRight } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -12,7 +14,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault()
     setError('')
 
     if (!email.trim() || !password.trim()) {
@@ -34,103 +37,147 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'DM Sans', sans-serif; background: #fafaf9; color: #1a1a18; }
-        .auth-input {
-          width: 100%; border: 0.5px solid #e5e3dd; border-radius: 12px;
-          padding: 0.75rem 1rem; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
-          color: #1a1a18; background: #fff; outline: none; transition: border-color .2s;
-        }
-        .auth-input:focus { border-color: #2563eb; }
-        .auth-btn {
-          width: 100%; background: #1a1a18; color: #fafaf9; border: none;
-          padding: 0.85rem; border-radius: 100px; font-size: 0.9rem;
-          font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity .2s;
-        }
-        .auth-btn:hover { opacity: .85; }
-        .auth-btn:disabled { opacity: .5; cursor: not-allowed; }
-      `}</style>
+    <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans selection:bg-amber-500/35 selection:text-white flex flex-col justify-between relative overflow-hidden">
+      
+      {/* Background Gradients */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-amber-500/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-0 right-10 w-[300px] h-[300px] bg-blue-500/[0.03] rounded-full blur-3xl pointer-events-none -z-10" />
 
-      <div style={{ minHeight: '100vh', background: '#fafaf9', display: 'flex', flexDirection: 'column' }}>
+      {/* NAVBAR */}
+      <header className="px-6 py-5 border-b border-zinc-900/60 backdrop-blur-md bg-black/20 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 cursor-pointer text-white no-underline">
+          <Scissors className="w-5 h-5 text-amber-500 transform rotate-90" />
+          <span className="text-md font-bold tracking-tight">
+            Barber<span className="text-amber-500">ShopBR</span>
+          </span>
+        </Link>
+        <Link 
+          href="/" 
+          className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+        >
+          Voltar para Home
+        </Link>
+      </header>
 
-        {/* NAVBAR */}
-        <header style={{ padding: '1.25rem 2rem', borderBottom: '0.5px solid #e5e3dd' }}>
-          <Link href="/" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.35rem', color: '#1a1a18', textDecoration: 'none', letterSpacing: '-0.01em' }}>
-            Barber<span style={{ color: '#2563eb' }}>ShopBR</span>
-          </Link>
-        </header>
-
-        {/* CONTEÚDO */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '420px' }}>
-
-            {/* TOPO */}
-            <div style={{ marginBottom: '2.5rem' }}>
-              <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: '2rem', fontWeight: 400, letterSpacing: '-0.02em', color: '#1a1a18', marginBottom: '0.4rem' }}>
-                Bem-vindo de volta
-              </h1>
-              <p style={{ fontSize: '0.9rem', color: '#6b6b67', fontWeight: 300 }}>
-                Acesse o painel da sua barbearia.
-              </p>
+      {/* CONTENT */}
+      <div className="flex-1 flex items-center justify-center px-4 py-16">
+        <motion.div 
+          initial={{ opacity: 0, y: 15, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-[420px]"
+        >
+          {/* Top Info */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-amber-400 mb-4 tracking-wider uppercase">
+              <Sparkles className="w-3 h-3" />
+              <span>Painel do Cliente</span>
             </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
+              Bem-vindo de volta
+            </h1>
+            <p className="text-xs text-zinc-400 font-light mt-2">
+              Acesse o sistema operacional da sua barbearia.
+            </p>
+          </div>
 
-            {/* ERRO */}
+          {/* Form Card */}
+          <div className="p-6 sm:p-8 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 backdrop-blur-md shadow-2xl relative overflow-hidden">
+            
+            {/* Glow accent */}
+            <div className="absolute -right-12 -top-12 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            {/* ERROR ALERT */}
             {error && (
-              <div style={{ background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: '12px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-                <p style={{ fontSize: '0.875rem', color: '#dc2626' }}>{error}</p>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-6"
+              >
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <p className="text-xs text-red-400 font-medium">{error}</p>
+              </motion.div>
             )}
 
             {/* FORM */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label style={{ fontSize: '0.825rem', color: '#6b6b67', display: 'block', marginBottom: '0.4rem' }}>Email</label>
-                <input
-                  className="auth-input"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                />
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">Email</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                    <Mail className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="w-full bg-zinc-900/50 border border-zinc-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-3 text-xs text-white placeholder-zinc-500 outline-none transition-colors"
+                  />
+                </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.825rem', color: '#6b6b67', display: 'block', marginBottom: '0.4rem' }}>Senha</label>
-                <input
-                  className="auth-input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                />
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">Senha</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full bg-zinc-900/50 border border-zinc-800 focus:border-amber-500 rounded-xl pl-11 pr-4 py-3 text-xs text-white placeholder-zinc-500 outline-none transition-colors"
+                  />
+                </div>
               </div>
 
-              <button className="auth-btn" onClick={handleLogin} disabled={loading} style={{ marginTop: '0.5rem' }}>
-                {loading ? 'Entrando...' : 'Entrar'}
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 relative overflow-hidden group/btn mt-6"
+              >
+                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover/btn:animate-[shine_0.8s_ease-out] block" />
+                {loading ? 'Entrando...' : 'Entrar na Conta'}
+                <ChevronRight className="w-4 h-4" />
               </button>
+            </form>
 
-            </div>
-
-            {/* FOOTER */}
-            <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e5e3dd', textAlign: 'center' }}>
-              <p style={{ fontSize: '0.875rem', color: '#6b6b67', fontWeight: 300 }}>
+            {/* Bottom Register Link */}
+            <div className="mt-8 pt-6 border-t border-zinc-900/80 text-center">
+              <p className="text-xs text-zinc-400 font-light">
                 Ainda não tem conta?{' '}
-                <Link href="/#plans" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 400 }}>
+                <Link href="/#plans" className="text-amber-500 hover:text-amber-400 transition-colors font-medium no-underline">
                   Escolher um plano
                 </Link>
               </p>
             </div>
 
           </div>
-        </div>
-
+        </motion.div>
       </div>
-    </>
+
+      {/* FOOTER */}
+      <footer className="py-6 border-t border-zinc-900/40 text-center">
+        <p className="text-[10px] text-zinc-600 font-light">
+          © 2026 BarberShopBR. Todos os direitos reservados.
+        </p>
+      </footer>
+
+      {/* Global shine utility style */}
+      <style jsx global>{`
+        @keyframes shine {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
+    </div>
   )
 }

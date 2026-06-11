@@ -1,0 +1,161 @@
+/* Efeito 3D Card Hover e Mouse Tracking Glow */
+.premium-card-3d {
+  position: relative;
+  transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transform: perspective(1000px) rotateX(var(--rotate-x, 0deg)) rotateY(var(--rotate-y, 0deg));
+  will-change: transform;
+}
+
+/* Glow na borda que acompanha o mouse */
+.premium-card-3d::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: radial-gradient(
+    300px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+    rgba(245, 158, 11, 0.22),
+    transparent 80%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.premium-card-3d:hover::before {
+  opacity: 1;
+}
+
+/* Glow no fundo que acompanha o mouse */
+.premium-card-3d__glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    250px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+    rgba(245, 158, 11, 0.05),
+    transparent 80%
+  );
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.premium-card-3d:hover .premium-card-3d__glow {
+  opacity: 1;
+}
+
+/* Preservação de 3D para elementos filhos */
+.premium-card-3d__content {
+  transform: translateZ(30px);
+  position: relative;
+  z-index: 3;
+}
+
+/* Borda Rotatória Dourada Animada (Estilo StarBorder/Stripe) */
+.animated-gold-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.animated-gold-border::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 20%,
+    rgba(245, 158, 11, 0.4) 35%,
+    #f59e0b 50%,
+    rgba(255, 191, 0, 0.4) 65%,
+    transparent 80%
+  );
+  animation: rotate-border 8s linear infinite;
+  pointer-events: none;
+}
+
+.animated-gold-border__inner {
+  position: relative;
+  z-index: 1;
+  border-radius: inherit;
+  height: 100%;
+  width: 100%;
+}
+
+@keyframes rotate-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Scroll suave Lenis */
+html.lenis {
+  height: auto;
+}
+
+.lenis-clean {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Ambient Glow de fundo */
+.ambient-gold-glow {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.04) 0%, transparent 70%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+
+/* Transições e Estilos de Depoimentos */
+.testimonial-carousel {
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* Efeito de Vidro Luxuoso (Glassmorphism) */
+.glass-panel {
+  background: rgba(12, 12, 14, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
