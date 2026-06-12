@@ -37,47 +37,72 @@ export default function CustomersPage() {
   useEffect(() => {
     if (!barbershop) return
 
-    const loadSubscriptions = async () => {
+    const loadData = async () => {
       try {
         setLoading(true)
-        // Carregar assinaturas (separado por causa de restrições de relacionamentos PostgREST no Supabase)
-        const { data: subsData } = await supabase
-          .from('subscriptions')
+        // 1. Carregar todos os clientes registrados da barbearia
+        const { data: customersData, error: customersError } = await supabase
+          .from('customers')
           .select('*')
           .eq('barbershop_id', barbershop.id)
           .order('created_at', { ascending: false })
 
-        if (subsData && subsData.length > 0) {
-          const customerIds = [...new Set(subsData.map(sub => sub.customer_id).filter(Boolean))]
-          if (customerIds.length > 0) {
-            const { data: customersData } = await supabase
-              .from('customers')
-              .select('*')
-              .in('id', customerIds)
+        if (customersError) throw customersError
 
-            const customerMap = {}
-            customersData?.forEach(cust => {
-              customerMap[cust.id] = cust
-            })
+        // 2. Carregar todas as assinaturas da barbearia
+        const { data: subsData, error: subsError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('barbershop_id', barbershop.id)
 
-            const merged = subsData.map(sub => ({
-              ...sub,
-              customer: customerMap[sub.customer_id] || null
-            }))
-            setSubscriptions(merged)
-          } else {
-            setSubscriptions(subsData.map(sub => ({ ...sub, customer: null })))
+        if (subsError) throw subsError
+
+        // 3. Mesclar dados para garantir que mesmo clientes sem assinatura ativa apareçam
+        const subMap = {}
+        subsData?.forEach(sub => {
+          const current = subMap[sub.customer_id]
+          if (!current || sub.status === 'active' || (sub.status === 'pending' && current.status !== 'active')) {
+            subMap[sub.customer_id] = sub
           }
-        } else {
-          setSubscriptions([])
-        }
+        })
+
+        const merged = (customersData || []).map(cust => {
+          const sub = subMap[cust.id]
+          if (sub) {
+            return {
+              ...sub,
+              customer: cust
+            }
+          } else {
+            return {
+              id: `no-sub-${cust.id}`,
+              customer_id: cust.id,
+              barbershop_id: barbershop.id,
+              plan_name: 'Sem Assinatura',
+              price: 0,
+              status: 'none',
+              starts_at: null,
+              expires_at: null,
+              created_at: cust.created_at,
+              customer: cust
+            }
+          }
+        })
+
+        // Ordenar por prioridade de status: ativos, depois pendentes, depois cancelados, por fim sem assinatura
+        merged.sort((a, b) => {
+          const statusOrder = { active: 1, pending: 2, cancelled: 3, none: 4 }
+          return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99)
+        })
+
+        setSubscriptions(merged)
       } catch (err) {
-        console.error('Erro ao carregar assinaturas:', err)
+        console.error('Erro ao carregar clientes e assinaturas:', err)
       } finally {
         setLoading(false)
       }
     }
-    loadSubscriptions()
+    loadData()
   }, [barbershop])
 
   // Limpar número do WhatsApp para o link wa.me
@@ -294,16 +319,20 @@ export default function CustomersPage() {
 
                         {/* Período da Assinatura */}
                         <td className="px-6 py-4 text-zinc-500">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="flex items-center gap-1 text-[10px]">
-                              <Calendar size={9} />
-                              <span>Início: {new Date(sub.starts_at).toLocaleDateString('pt-BR')}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-[10px]">
-                              <Clock size={9} />
-                              <span>Expira: {new Date(sub.expires_at).toLocaleDateString('pt-BR')}</span>
-                            </span>
-                          </div>
+                          {sub.starts_at ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="flex items-center gap-1 text-[10px]">
+                                <Calendar size={9} />
+                                <span>Início: {new Date(sub.starts_at).toLocaleDateString('pt-BR')}</span>
+                              </span>
+                              <span className="flex items-center gap-1 text-[10px]">
+                                <Clock size={9} />
+                                <span>Expira: {new Date(sub.expires_at).toLocaleDateString('pt-BR')}</span>
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-zinc-500 font-mono">N/A</span>
+                          )}
                         </td>
 
                         {/* Status */}
@@ -329,7 +358,7 @@ export default function CustomersPage() {
                                 <Clock size={10} />
                                 <span>Pendente</span>
                               </motion.span>
-                            ) : (
+                            ) : sub.status === 'cancelled' ? (
                               <motion.span 
                                 key="cancelled"
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -338,6 +367,16 @@ export default function CustomersPage() {
                               >
                                 <X size={10} />
                                 <span>Cancelado</span>
+                              </motion.span>
+                            ) : (
+                              <motion.span 
+                                key="none"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-zinc-800 text-zinc-500 bg-zinc-900/10"
+                              >
+                                <Users size={10} />
+                                <span>Sem Clube</span>
                               </motion.span>
                             )}
                           </AnimatePresence>
@@ -351,7 +390,7 @@ export default function CustomersPage() {
                             ) : (
                               <>
                                 {/* Ação de Aprovar/Ativar (Se for Pendente ou Cancelado) */}
-                                {sub.status !== 'active' && (
+                                {sub.status !== 'active' && sub.status !== 'none' && (
                                   <button
                                     onClick={() => handleUpdateStatus(sub.id, 'active')}
                                     className={`p-2 rounded-lg border transition-colors cursor-pointer ${
@@ -366,7 +405,7 @@ export default function CustomersPage() {
                                 )}
 
                                 {/* Ação de Cancelar (Se for Ativo ou Pendente) */}
-                                {sub.status !== 'cancelled' && (
+                                {sub.status !== 'cancelled' && sub.status !== 'none' && (
                                   <button
                                     onClick={() => handleUpdateStatus(sub.id, 'cancelled')}
                                     className={`p-2 rounded-lg border transition-colors cursor-pointer ${

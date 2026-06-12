@@ -68,182 +68,7 @@ export default function ReportsPage() {
   const [lineChartHoverIndex, setLineChartHoverIndex] = useState(null)
   const [donutHoverIndex, setDonutHoverIndex] = useState(null)
 
-  // Função para gerar dados analíticos simulados dependendo dos filtros selecionados
-  const generateData = () => {
-    // Semente simples baseada nos valores dos filtros para manter os dados reprodutíveis ao alternar
-    let seed = 1
-    if (timeFilter === 'month') {
-      seed = (selectedMonth + 1) * (selectedYear === '2026' ? 1.5 : 1)
-    } else if (timeFilter === 'year') {
-      seed = selectedYear === '2026' ? 15.0 : 10.0
-    } else {
-      const startMs = new Date(startDate).getTime()
-      const endMs = new Date(endDate).getTime()
-      const diffDays = Math.max(1, Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)))
-      seed = (diffDays / 30) * 1.2
-    }
 
-    // Fator multiplicador de variação
-    const mul = (val) => Math.round(val * seed * 100) / 100
-    const mulInt = (val) => Math.round(val * seed)
-
-    // 1. CARDS DE KPI (Valores Base para Junho de 2026 com seed = 1.5 aprox)
-    const kpis = {
-      revenue: {
-        value: mul(32613.33),
-        change: 12.4,
-        isPositive: true,
-        label: 'Faturamento Total'
-      },
-      appointments: {
-        value: mulInt(561),
-        change: 8.5,
-        isPositive: true,
-        label: 'Total Atendimentos'
-      },
-      ticket: {
-        value: mul(58.13),
-        change: 3.6,
-        isPositive: true,
-        label: 'Ticket Médio'
-      },
-      productsSold: {
-        value: mulInt(104),
-        change: 18.2,
-        isPositive: true,
-        label: 'Produtos Vendidos'
-      },
-      commissions: {
-        value: mul(9784.00),
-        change: 10.5,
-        isPositive: true,
-        label: 'Comissões Pagas'
-      },
-      subscriptions: {
-        value: mulInt(32),
-        change: 15.0,
-        isPositive: true,
-        label: 'Novos Assinantes'
-      }
-    }
-
-    // 2. EVOLUÇÃO DE FATURAMENTO (Gráfico de Linha/Área)
-    // Gerar 10 pontos de dados ao longo do período
-    const revenueLabels = []
-    const revenueCurrent = []
-    const revenuePrevious = []
-
-    if (timeFilter === 'year') {
-      // Por meses
-      MONTHS.forEach((m, idx) => {
-        revenueLabels.push(m.slice(0, 3))
-        revenueCurrent.push(mul(3000 + Math.sin(idx) * 1200 + idx * 300))
-        revenuePrevious.push(mul(2500 + Math.sin(idx) * 1000 + idx * 200))
-      })
-    } else {
-      // Por dias/semanas
-      const totalPoints = 12
-      for (let i = 1; i <= totalPoints; i++) {
-        revenueLabels.push(`Dia ${Math.round((i / totalPoints) * 30)}`)
-        revenueCurrent.push(mul(800 + Math.sin(i * 1.5) * 450 + (i % 3 === 0 ? 300 : 0)))
-        revenuePrevious.push(mul(700 + Math.sin(i * 1.5) * 350))
-      }
-    }
-
-    // 3. DISTRIBUIÇÃO DE RECEITA (Donut)
-    const distribution = [
-      { name: 'Serviços', value: mul(21200.00), percentage: 65, color: COLORS.accent },
-      { name: 'Produtos', value: mul(6520.00), percentage: 20, color: COLORS.success },
-      { name: 'Planos', value: mul(4893.33), percentage: 15, color: COLORS.info }
-    ]
-
-    // 4. ATENDIMENTOS E COMISSÕES POR BARBEIRO
-    const barbers = [
-      {
-        name: 'Carlinhos Visagista',
-        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop',
-        appointments: mulInt(140),
-        revenue: mul(8120.00),
-        commissionPercent: 40,
-        commissionValue: mul(3248.00),
-        ticket: mul(58.00),
-        ranking: 1,
-        isTopPerformer: true
-      },
-      {
-        name: 'Luana Andrade',
-        photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=200&auto=format&fit=crop',
-        appointments: mulInt(130),
-        revenue: mul(7800.00),
-        commissionPercent: 45,
-        commissionValue: mul(3510.00),
-        ticket: mul(60.00),
-        ranking: 2,
-        isTopPerformer: false
-      },
-      {
-        name: 'Felipe Silva',
-        photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop',
-        appointments: mulInt(120),
-        revenue: mul(6600.00),
-        commissionPercent: 35,
-        commissionValue: mul(2310.00),
-        ticket: mul(55.00),
-        ranking: 3,
-        isTopPerformer: false
-      },
-      {
-        name: 'Mateus Costa',
-        photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop',
-        appointments: mulInt(105),
-        revenue: mul(6090.00),
-        commissionPercent: 35,
-        commissionValue: mul(2131.50),
-        ticket: mul(58.00),
-        ranking: 4,
-        isTopPerformer: false
-      },
-      {
-        name: 'Thiago Ramos',
-        photo: 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?q=80&w=200&auto=format&fit=crop',
-        appointments: mulInt(66),
-        revenue: mul(4003.33),
-        commissionPercent: 30,
-        commissionValue: mul(1201.00),
-        ticket: mul(60.65),
-        ranking: 5,
-        isTopPerformer: false
-      }
-    ]
-
-    // 5. RELATÓRIO DE VENDAS DE PRODUTOS
-    const products = [
-      { name: 'Pomada Matte Modeladora Strong', sold: mulInt(38), unitPrice: 79.90, revenue: mul(3036.20), share: 46.5 },
-      { name: 'Shampoo Carbon Cabelo & Barba', sold: mulInt(30), unitPrice: 59.90, revenue: mul(1797.00), share: 27.5 },
-      { name: 'Condicionador Hidratante Silk', sold: mulInt(22), unitPrice: 49.90, revenue: mul(1097.80), share: 16.8 },
-      { name: 'Óleo de Barba Maciez Suprema', sold: mulInt(14), unitPrice: 39.90, revenue: mul(558.60), share: 8.6 }
-    ]
-
-    // 6. PLANOS ASSINADOS
-    const plans = [
-      { name: 'Clube Gold VIP', activeCount: mulInt(18), revenue: mul(2160.00), growth: 15.4, color: COLORS.accent },
-      { name: 'Clube Standard', activeCount: mulInt(10), revenue: mul(800.00), growth: 8.2, color: COLORS.success },
-      { name: 'Clube Premium Beard', activeCount: mulInt(4), revenue: mul(600.00), growth: 20.0, color: COLORS.info }
-    ]
-
-    setReportData({
-      kpis,
-      revenueChart: {
-        labels: revenueLabels,
-        current: revenueCurrent,
-        previous: revenuePrevious
-      },
-      distribution,
-      barbers,
-      products,
-      plans
-    })
-  }
 
   // Helper para obter o intervalo de datas do período atual e anterior
   const getPeriodDates = (filter, month, year, start, end) => {
@@ -358,7 +183,7 @@ export default function ReportsPage() {
 
       const getCommissions = (list, barbersList) => {
         const map = {}
-        barbersList?.forEach(b => { map[b.id] = b.commission || 35 })
+        barbersList?.forEach(b => { map[b.id] = b.commission_percentage || 35 })
         return list.filter(a => a.status === 'Concluído').reduce((sum, a) => {
           const comm = map[a.barber_id] || 35
           return sum + (Number(a.services?.price || 0) * comm) / 100
@@ -452,7 +277,7 @@ export default function ReportsPage() {
         const barberAppts = appts.filter(a => a.barber_id === barber.id)
         const completedAppts = barberAppts.filter(a => a.status === 'Concluído')
         const bRev = completedAppts.reduce((sum, a) => sum + Number(a.services?.price || 0), 0)
-        const bComm = (bRev * (barber.commission || 35)) / 100
+        const bComm = (bRev * (barber.commission_percentage || 35)) / 100
         const bTicket = completedAppts.length > 0 ? (bRev / completedAppts.length) : 0
 
         return {
@@ -460,7 +285,7 @@ export default function ReportsPage() {
           photo: barber.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop',
           appointments: completedAppts.length,
           revenue: bRev,
-          commissionPercent: barber.commission || 35,
+          commissionPercent: barber.commission_percentage || 35,
           commissionValue: bComm,
           ticket: bTicket,
           ranking: idx + 1,

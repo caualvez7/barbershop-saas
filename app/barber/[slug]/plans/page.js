@@ -51,11 +51,40 @@ export default function PlansPage() {
         .eq('barbershop_id', shopData.id)
         .eq('active', true)
 
-      const { data: customerData } = await supabase
+      let { data: customerData } = await supabase
         .from('customers')
         .select('*')
         .eq('user_id', user.id)
-        .single()
+        .eq('barbershop_id', shopData.id)
+        .maybeSingle()
+
+      if (!customerData) {
+        const { data: otherProfiles } = await supabase
+          .from('customers')
+          .select('name, whatsapp')
+          .eq('user_id', user.id)
+          .limit(1)
+
+        const name = otherProfiles?.[0]?.name || user.email?.split('@')[0] || 'Cliente'
+        const whatsapp = otherProfiles?.[0]?.whatsapp || ''
+
+        const { data: newCustomer, error: insertError } = await supabase
+          .from('customers')
+          .insert({
+            user_id: user.id,
+            barbershop_id: shopData.id,
+            name,
+            email: user.email,
+            whatsapp
+          })
+          .select()
+          .single()
+
+        if (!insertError && newCustomer) {
+          customerData = newCustomer
+        }
+      }
+
 
       setShop(shopData)
       setPlans(plansData || [])

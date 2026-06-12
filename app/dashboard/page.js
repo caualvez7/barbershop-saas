@@ -356,6 +356,8 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState([])
   const [barbers, setBarbers] = useState([])
   const [services, setServices] = useState([])
+  const [productSales, setProductSales] = useState([])
+  const [subscriptions, setSubscriptions] = useState([])
 
   const rollingDays = getRollingDays()
 
@@ -373,15 +375,19 @@ export default function Dashboard() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const [apptRes, barbersRes, servicesRes] = await Promise.all([
+        const [apptRes, barbersRes, servicesRes, salesRes, subsRes] = await Promise.all([
           supabase.from('appointments').select('*, services(name, price), barbers(name)').eq('barbershop_id', barbershop.id).order('time', { ascending: true }),
           supabase.from('barbers').select('*').eq('barbershop_id', barbershop.id).eq('active', true),
-          supabase.from('services').select('*').eq('barbershop_id', barbershop.id)
+          supabase.from('services').select('*').eq('barbershop_id', barbershop.id),
+          supabase.from('product_sales').select('*').eq('barbershop_id', barbershop.id),
+          supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id)
         ])
 
         setAppointments(apptRes.data || [])
         setBarbers(barbersRes.data || [])
         setServices(servicesRes.data || [])
+        setProductSales(salesRes.data || [])
+        setSubscriptions(subsRes.data || [])
       } catch (err) {
         console.error('Erro ao carregar dados do dashboard:', err)
       } finally {
@@ -419,14 +425,30 @@ export default function Dashboard() {
   const currentMonthAppts = appointments.filter(appt => appt.date.startsWith(currentMonthPrefix))
   const prevMonthAppts = appointments.filter(appt => appt.date.startsWith(prevMonthPrefix))
 
-  // 1. Monthly Revenue faturamento
-  const currentMonthRevenue = currentMonthAppts
-    .filter(appt => appt.status === 'Concluído' || appt.status === 'Confirmado')
-    .reduce((acc, appt) => acc + Number(appt.services?.price || 0), 0)
+  const currentMonthSales = productSales.filter(s => s.created_at && s.created_at.startsWith(currentMonthPrefix))
+  const prevMonthSales = productSales.filter(s => s.created_at && s.created_at.startsWith(prevMonthPrefix))
 
-  const prevMonthRevenue = prevMonthAppts
+  const currentMonthSubs = subscriptions.filter(s => s.status === 'active' && s.created_at && s.created_at.startsWith(currentMonthPrefix))
+  const prevMonthSubs = subscriptions.filter(s => s.status === 'active' && s.created_at && s.created_at.startsWith(prevMonthPrefix))
+
+  // 1. Monthly Revenue faturamento (Services + Product Sales + Active Subscriptions)
+  const currentMonthServiceRev = currentMonthAppts
     .filter(appt => appt.status === 'Concluído' || appt.status === 'Confirmado')
     .reduce((acc, appt) => acc + Number(appt.services?.price || 0), 0)
+  const currentMonthProductRev = currentMonthSales
+    .reduce((acc, s) => acc + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
+  const currentMonthSubRev = currentMonthSubs
+    .reduce((acc, s) => acc + Number(s.price || 99.90), 0)
+  const currentMonthRevenue = currentMonthServiceRev + currentMonthProductRev + currentMonthSubRev
+
+  const prevMonthServiceRev = prevMonthAppts
+    .filter(appt => appt.status === 'Concluído' || appt.status === 'Confirmado')
+    .reduce((acc, appt) => acc + Number(appt.services?.price || 0), 0)
+  const prevMonthProductRev = prevMonthSales
+    .reduce((acc, s) => acc + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
+  const prevMonthSubRev = prevMonthSubs
+    .reduce((acc, s) => acc + Number(s.price || 99.90), 0)
+  const prevMonthRevenue = prevMonthServiceRev + prevMonthProductRev + prevMonthSubRev
 
   let revenueTrend = '0%'
   if (prevMonthRevenue > 0) {
@@ -447,7 +469,7 @@ export default function Dashboard() {
     apptsTrend = '+100%'
   }
 
-  // 3. Active Customers counts and trend
+  // 3. Active Customers counts and trend (labeled as Clientes Assinantes)
   const currentActiveCustomers = new Set(
     currentMonthAppts.filter(appt => appt.status !== 'Cancelado').map(appt => appt.customer_name)
   ).size
@@ -462,18 +484,9 @@ export default function Dashboard() {
     customersTrend = '+100%'
   }
 
-  // 4. New Customers counts and trend
-  const customerFirstDates = {}
-  appointments.forEach(appt => {
-    const name = appt.customer_name
-    if (!customerFirstDates[name] || appt.date < customerFirstDates[name]) {
-      customerFirstDates[name] = appt.date
-    }
-  })
-  const currentNewCustomers = Object.values(customerFirstDates)
-    .filter(date => date.startsWith(currentMonthPrefix)).length
-  const prevNewCustomers = Object.values(customerFirstDates)
-    .filter(date => date.startsWith(prevMonthPrefix)).length
+  // 4. New Customer Subscriptions counts and trend (Novos Clientes Assinantes)
+  const currentNewCustomers = currentMonthSubs.length
+  const prevNewCustomers = prevMonthSubs.length
   let newCustomersTrend = '0%'
   if (prevNewCustomers > 0) {
     const diff = ((currentNewCustomers - prevNewCustomers) / prevNewCustomers) * 100
@@ -494,9 +507,16 @@ export default function Dashboard() {
   }
 
   const revenueDailyVals = past7Days.map(dateStr => {
-    return appointments
+    const serviceVal = appointments
       .filter(appt => appt.date === dateStr && (appt.status === 'Concluído' || appt.status === 'Confirmado'))
       .reduce((acc, appt) => acc + Number(appt.services?.price || 0), 0)
+    const productVal = productSales
+      .filter(s => s.created_at && s.created_at.startsWith(dateStr))
+      .reduce((acc, s) => acc + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
+    const subVal = subscriptions
+      .filter(s => s.status === 'active' && s.created_at && s.created_at.startsWith(dateStr))
+      .reduce((acc, s) => acc + Number(s.price || 99.90), 0)
+    return serviceVal + productVal + subVal
   })
   const apptsDailyVals = past7Days.map(dateStr => {
     return appointments.filter(appt => appt.date === dateStr).length
@@ -507,7 +527,7 @@ export default function Dashboard() {
     ).size
   })
   const newCustomersDailyVals = past7Days.map(dateStr => {
-    return Object.entries(customerFirstDates).filter(([_, firstDate]) => firstDate === dateStr).length
+    return subscriptions.filter(s => s.status === 'active' && s.created_at && s.created_at.startsWith(dateStr)).length
   })
 
   const revenueSparkline = getSparklinePoints(revenueDailyVals)
@@ -523,9 +543,18 @@ export default function Dashboard() {
     const label = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
     
     const dayAppts = appointments.filter(appt => appt.date === dateStr)
-    const revenueVal = dayAppts
+    const daySales = productSales.filter(s => s.created_at && s.created_at.startsWith(dateStr))
+    const daySubs = subscriptions.filter(s => s.status === 'active' && s.created_at && s.created_at.startsWith(dateStr))
+
+    const serviceVal = dayAppts
       .filter(appt => appt.status === 'Concluído' || appt.status === 'Confirmado')
       .reduce((acc, appt) => acc + Number(appt.services?.price || 0), 0)
+    const productVal = daySales
+      .reduce((acc, s) => acc + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
+    const subVal = daySubs
+      .reduce((acc, s) => acc + Number(s.price || 99.90), 0)
+
+    const revenueVal = serviceVal + productVal + subVal
     const apptsCount = dayAppts.length
 
     return {
@@ -690,7 +719,7 @@ export default function Dashboard() {
             accentColor="#f59e0b" 
           />
           <KPICard 
-            title="Clientes Ativos" 
+            title="Clientes Assinantes" 
             value={currentActiveCustomers} 
             trend={customersTrend} 
             sparklinePoints={customersSparkline} 
@@ -698,7 +727,7 @@ export default function Dashboard() {
             accentColor="#10B981" 
           />
           <KPICard 
-            title="Novos Clientes" 
+            title="Novos Clientes Assinantes" 
             value={currentNewCustomers} 
             trend={newCustomersTrend} 
             sparklinePoints={newCustomersSparkline} 
