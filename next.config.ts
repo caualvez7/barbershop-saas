@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion', 'gsap', 'three'],
   },
+  // Silencia o erro do Turbopack ao usar webpack customizado
+  turbopack: {},
   // Reduz a complexidade dos Source Maps em desenvolvimento para economizar até 50% de Heap RAM
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {
