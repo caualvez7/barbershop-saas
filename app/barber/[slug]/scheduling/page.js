@@ -121,7 +121,33 @@ export default function SchedulingPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      let user = null
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        user = session?.user
+        if (!user) {
+          const { data: { user: fetchedUser } } = await supabase.auth.getUser()
+          user = fetchedUser
+        }
+      } catch (err) {
+        console.warn('Erro na busca inicial de sessao:', err)
+      }
+
+      // Retry com tolerancia em caso de atraso na inicializacao do cliente
+      if (!user) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        try {
+          const { data: { session: retrySession } } = await supabase.auth.getSession()
+          user = retrySession?.user
+          if (!user) {
+            const { data: { user: retryUser } } = await supabase.auth.getUser()
+            user = retryUser
+          }
+        } catch (err) {
+          console.warn('Erro no retry de sessao:', err)
+        }
+      }
+
       if (!user) { 
         router.push(`/barber/${slug}/auth`)
         return 
@@ -167,8 +193,20 @@ export default function SchedulingPage() {
         if (!insertError && newCustomer) {
           customerData = newCustomer
         } else {
-          router.push(`/barber/${slug}/auth`)
-          return
+          // Contingência: Tentar novo SELECT em caso de concorrência ou restrição de chave única
+          const { data: fallbackCustomer } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('barbershop_id', shopData.id)
+            .maybeSingle()
+
+          if (fallbackCustomer) {
+            customerData = fallbackCustomer
+          } else {
+            router.push(`/barber/${slug}/auth`)
+            return
+          }
         }
       }
 

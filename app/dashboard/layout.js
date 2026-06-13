@@ -40,11 +40,20 @@ export default function DashboardRootLayout({ children }) {
 
         setSession(currentSession)
 
-        const { data: shopData } = await supabase
+        const { data: shopData, error: shopError } = await supabase
           .from('barbershops')
           .select('*')
           .eq('user_id', user.id)
           .single()
+
+        if (shopError || !shopData) {
+          console.warn('Usuário não possui barbearia cadastrada. Fazendo logout de segurança...')
+          await supabase.auth.signOut()
+          setSession(null)
+          setBarbershop(null)
+          router.push('/login')
+          return
+        }
 
         setBarbershop(shopData)
       } catch (err) {
@@ -56,11 +65,33 @@ export default function DashboardRootLayout({ children }) {
     }
     loadSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setBarbershop(null)
         router.push('/login')
-      } else if (event === 'SIGNED_IN' && currentSession) {
+      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && currentSession) {
         setSession(currentSession)
+        try {
+          const { data: shopData, error: shopError } = await supabase
+            .from('barbershops')
+            .select('*')
+            .eq('user_id', currentSession.user.id)
+            .single()
+
+          if (shopError || !shopData) {
+            console.warn('Usuário sem barbearia associada no evento. Fazendo logout...')
+            await supabase.auth.signOut()
+            setSession(null)
+            setBarbershop(null)
+            router.push('/login')
+            return
+          }
+
+          setBarbershop(shopData)
+        } catch (err) {
+          console.error('Erro ao sincronizar barbearia após mudança de auth:', err)
+        }
       }
     })
 

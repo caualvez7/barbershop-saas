@@ -63,5 +63,10 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/barber/:slug/plans',
+    '/barber/:slug/scheduling',
+    '/barber/:slug/checkout',
+  ],
 }

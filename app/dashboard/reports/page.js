@@ -147,44 +147,35 @@ export default function ReportsPage() {
       ])
 
       const appts = currentApptsRes.data || []
-      const sales = currentSalesRes.data || []
-      const subs = currentSubsRes.data || []
-
-      const prevApptsList = previousApptsRes.data || []
-      const prevSalesList = previousSalesRes.data || []
-      const prevSubsList = previousSubsRes.data || []
-
       // Helper para calcular faturamento
       const getRevenueFromServices = (list) => list.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').reduce((sum, a) => sum + Number(a.services?.price || 0), 0)
-      const getRevenueFromProducts = (list) => list.reduce((sum, s) => sum + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
+      const getRevenueFromProducts = (list) => list.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
       const getRevenueFromPlans = (list) => list.filter(sub => sub.status === 'active').reduce((sum, s) => sum + Number(s.price || 99.90), 0)
 
       // Faturamento Atual
       const revenueFromServices = getRevenueFromServices(appts)
       const revenueFromProducts = getRevenueFromProducts(sales)
       const revenueFromPlans = getRevenueFromPlans(subs)
-      const totalRevenue = revenueFromServices + revenueFromProducts + revenueFromPlans
 
       // Faturamento Anterior
       const prevRevenueFromServices = getRevenueFromServices(prevApptsList)
       const prevRevenueFromProducts = getRevenueFromProducts(prevSalesList)
       const prevRevenueFromPlans = getRevenueFromPlans(prevSubsList)
-      const prevTotalRevenue = prevRevenueFromServices + prevRevenueFromProducts + prevRevenueFromPlans
 
-      // Quantidades Atuais e Anteriores
-      const totalApptsCount = appts.length
-      const prevApptsCount = prevApptsList.length
+      // Quantidades Atuais e Anteriores (Apenas concluídos/confirmados/pagos)
+      const totalApptsCount = appts.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').length
+      const prevApptsCount = prevApptsList.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').length
 
-      const avgTicket = totalApptsCount > 0 ? (revenueFromServices / totalApptsCount) : 0
-      const prevAvgTicket = prevApptsCount > 0 ? (prevRevenueFromServices / prevApptsCount) : 0
+      const totalProductsSold = sales.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + (s.quantity || 1), 0)
+      const prevProductsSold = prevSalesList.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + (s.quantity || 1), 0)
 
-      const totalProductsSold = sales.reduce((sum, s) => sum + (s.quantity || 1), 0)
-      const prevProductsSold = prevSalesList.reduce((sum, s) => sum + (s.quantity || 1), 0)
+      const activeSubsCount = subs.filter(sub => sub.status === 'active').length
+      const prevActiveSubsCount = prevSubsList.filter(sub => sub.status === 'active').length
 
       const getCommissions = (list, barbersList) => {
         const map = {}
         barbersList?.forEach(b => { map[b.id] = b.commission_percentage || 35 })
-        return list.filter(a => a.status === 'Concluído').reduce((sum, a) => {
+        return list.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').reduce((sum, a) => {
           const comm = map[a.barber_id] || 35
           return sum + (Number(a.services?.price || 0) * comm) / 100
         }, 0)
@@ -193,9 +184,6 @@ export default function ReportsPage() {
       const totalCommissions = getCommissions(appts, barbersRes.data)
       const prevCommissions = getCommissions(prevApptsList, barbersRes.data)
 
-      const newSubsCount = subs.length
-      const prevSubsCount = prevSubsList.length
-
       // Cálculo dinâmico do crescimento MoM/período anterior
       const calcChange = (curr, prev) => {
         if (prev === 0) return curr > 0 ? 100 : 0
@@ -203,12 +191,24 @@ export default function ReportsPage() {
       }
 
       const kpis = {
-        revenue: { value: totalRevenue, change: calcChange(totalRevenue, prevTotalRevenue), isPositive: totalRevenue >= prevTotalRevenue, label: 'Faturamento Total' },
-        appointments: { value: totalApptsCount, change: calcChange(totalApptsCount, prevApptsCount), isPositive: totalApptsCount >= prevApptsCount, label: 'Total Atendimentos' },
-        ticket: { value: avgTicket, change: calcChange(avgTicket, prevAvgTicket), isPositive: avgTicket >= prevAvgTicket, label: 'Ticket Médio' },
-        productsSold: { value: totalProductsSold, change: calcChange(totalProductsSold, prevProductsSold), isPositive: totalProductsSold >= prevProductsSold, label: 'Produtos Vendidos' },
-        commissions: { value: totalCommissions, change: calcChange(totalCommissions, prevCommissions), isPositive: totalCommissions >= prevCommissions, label: 'Comissões Pagas' },
-        subscriptions: { value: newSubsCount, change: calcChange(newSubsCount, prevSubsCount), isPositive: newSubsCount >= prevSubsCount, label: 'Novos Assinantes' }
+        revenueServices: { value: revenueFromServices, change: calcChange(revenueFromServices, prevRevenueFromServices), isPositive: revenueFromServices >= prevRevenueFromServices, label: 'Faturamento de Atendimentos' },
+        revenuePlans: { value: revenueFromPlans, change: calcChange(revenueFromPlans, prevRevenueFromPlans), isPositive: revenueFromPlans >= prevRevenueFromPlans, label: 'Faturamento de Planos' },
+        revenueProducts: { value: revenueFromProducts, change: calcChange(revenueFromProducts, prevRevenueFromProducts), isPositive: revenueFromProducts >= prevRevenueFromProducts, label: 'Faturamento de Produtos' },
+        appointments: { value: totalApptsCount, change: calcChange(totalApptsCount, prevApptsCount), isPositive: totalApptsCount >= prevApptsCount, label: 'Atendimentos Realizados' },
+        subscriptions: { value: activeSubsCount, change: calcChange(activeSubsCount, prevActiveSubsCount), isPositive: activeSubsCount >= prevActiveSubsCount, label: 'Planos Assinados' },
+        productsSold: { value: totalProductsSold, change: calcChange(totalProductsSold, prevProductsSold), isPositive: totalProductsSold >= prevProductsSold, label: 'Produtos Vendidos' }
+      }
+
+      // Helper to generate dates array
+      const getDatesInRange = (startDateStr, endDateStr) => {
+        const dates = []
+        let curr = new Date(startDateStr + 'T12:00:00')
+        const end = new Date(endDateStr + 'T12:00:00')
+        while (curr <= end) {
+          dates.push(new Date(curr))
+          curr.setDate(curr.getDate() + 1)
+        }
+        return dates
       }
 
       // Gráfico de linha/área (Evolução diária ou mensal)
@@ -226,7 +226,7 @@ export default function ReportsPage() {
           })
           const monthSales = sales.filter(s => {
             const d = new Date(s.created_at)
-            return d.getMonth() === idx
+            return d.getMonth() === idx && s.status !== 'cancelled'
           })
           revenueCurrent.push(getRevenueFromServices(monthAppts) + getRevenueFromProducts(monthSales))
 
@@ -236,36 +236,37 @@ export default function ReportsPage() {
           })
           const prevMonthSales = prevSalesList.filter(s => {
             const d = new Date(s.created_at)
-            return d.getMonth() === idx
+            return d.getMonth() === idx && s.status !== 'cancelled'
           })
           revenuePrevious.push(getRevenueFromServices(prevMonthAppts) + getRevenueFromProducts(prevMonthSales))
         })
       } else {
-        const daysCount = timeFilter === 'month' ? 30 : 12
-        for (let i = 1; i <= daysCount; i++) {
-          revenueLabels.push(`Dia ${i}`)
+        const currentDates = getDatesInRange(currentStart, currentEnd)
+        const previousDates = getDatesInRange(previousStart, previousEnd)
+        
+        currentDates.forEach((d, idx) => {
+          const dayStr = String(d.getDate()).padStart(2, '0')
+          const monthStr = String(d.getMonth() + 1).padStart(2, '0')
+          revenueLabels.push(`${dayStr}/${monthStr}`)
           
-          const dayAppts = appts.filter(a => {
-            const dayNum = parseInt(a.date.split('-')[2])
-            return dayNum === i && (a.status === 'Concluído' || a.status === 'Confirmado')
-          })
-          const daySales = sales.filter(s => {
-            const dayNum = new Date(s.created_at).getDate()
-            return dayNum === i
-          })
+          const currentDateStr = d.toISOString().split('T')[0]
+          const dayAppts = appts.filter(a => a.date === currentDateStr)
+          const daySales = sales.filter(s => s.created_at && s.created_at.startsWith(currentDateStr) && s.status !== 'cancelled')
           revenueCurrent.push(getRevenueFromServices(dayAppts) + getRevenueFromProducts(daySales))
 
-          const prevDayAppts = prevApptsList.filter(a => {
-            const dayNum = parseInt(a.date.split('-')[2])
-            return dayNum === i && (a.status === 'Concluído' || a.status === 'Confirmado')
-          })
-          const prevDaySales = prevSalesList.filter(s => {
-            const dayNum = new Date(s.created_at).getDate()
-            return dayNum === i
-          })
-          revenuePrevious.push(getRevenueFromServices(prevDayAppts) + getRevenueFromProducts(prevDaySales))
-        }
+          const prevD = previousDates[idx]
+          if (prevD) {
+            const prevDateStr = prevD.toISOString().split('T')[0]
+            const prevDayAppts = prevApptsList.filter(a => a.date === prevDateStr)
+            const prevDaySales = prevSalesList.filter(s => s.created_at && s.created_at.startsWith(prevDateStr) && s.status !== 'cancelled')
+            revenuePrevious.push(getRevenueFromServices(prevDayAppts) + getRevenueFromProducts(prevDaySales))
+          } else {
+            revenuePrevious.push(0)
+          }
+        })
       }
+
+      const totalRevenue = revenueFromServices + revenueFromProducts + revenueFromPlans
 
       const distribution = [
         { name: 'Serviços', value: revenueFromServices, percentage: totalRevenue > 0 ? Math.round((revenueFromServices / totalRevenue) * 100) : 0, color: COLORS.accent },
@@ -275,7 +276,7 @@ export default function ReportsPage() {
 
       const realBarbers = (barbersRes.data || []).map((barber, idx) => {
         const barberAppts = appts.filter(a => a.barber_id === barber.id)
-        const completedAppts = barberAppts.filter(a => a.status === 'Concluído')
+        const completedAppts = barberAppts.filter(a => a.status === 'Concluído' || a.status === 'Confirmado')
         const bRev = completedAppts.reduce((sum, a) => sum + Number(a.services?.price || 0), 0)
         const bComm = (bRev * (barber.commission_percentage || 35)) / 100
         const bTicket = completedAppts.length > 0 ? (bRev / completedAppts.length) : 0
@@ -302,7 +303,7 @@ export default function ReportsPage() {
       }
 
       const productSalesMap = {};
-      sales.forEach(s => {
+      sales.filter(s => s.status !== 'cancelled').forEach(s => {
         const pName = s.products?.name || 'Produto Não Cadastrado'
         if (!productSalesMap[pName]) {
           productSalesMap[pName] = { name: pName, sold: 0, unitPrice: Number(s.price_at_purchase || 0), revenue: 0 }
@@ -317,7 +318,7 @@ export default function ReportsPage() {
       })
 
       const planSubsMap = {};
-      subs.forEach(sub => {
+      subs.filter(s => s.status === 'active').forEach(sub => {
         const pName = sub.plan_name || 'Plano Clássico'
         if (!planSubsMap[pName]) {
           planSubsMap[pName] = { name: pName, activeCount: 0, revenue: 0, growth: 0, color: COLORS.accent }
@@ -344,12 +345,12 @@ export default function ReportsPage() {
       // Se der erro crítico, ainda atualizamos o estado com valores zerados em vez de mock simulado
       setReportData({
         kpis: {
-          revenue: { value: 0, change: 0, isPositive: true, label: 'Faturamento Total' },
-          appointments: { value: 0, change: 0, isPositive: true, label: 'Total Atendimentos' },
-          ticket: { value: 0, change: 0, isPositive: true, label: 'Ticket Médio' },
-          productsSold: { value: 0, change: 0, isPositive: true, label: 'Produtos Vendidos' },
-          commissions: { value: 0, change: 0, isPositive: true, label: 'Comissões Pagas' },
-          subscriptions: { value: 0, change: 0, isPositive: true, label: 'Novos Assinantes' }
+          revenueServices: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Atendimentos' },
+          revenuePlans: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Planos' },
+          revenueProducts: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Produtos' },
+          appointments: { value: 0, change: 0, isPositive: true, label: 'Atendimentos Realizados' },
+          subscriptions: { value: 0, change: 0, isPositive: true, label: 'Planos Assinados' },
+          productsSold: { value: 0, change: 0, isPositive: true, label: 'Produtos Vendidos' }
         },
         revenueChart: { labels: ['Sem dados'], current: [0], previous: [0] },
         distribution: [
@@ -387,12 +388,12 @@ export default function ReportsPage() {
   }
 
   const kpisList = [
-    { key: 'revenue', icon: DollarSign, isCurrency: true, color: COLORS.accent },
-    { key: 'appointments', icon: Scissors, isCurrency: false, color: COLORS.info },
-    { key: 'ticket', icon: TrendingUp, isCurrency: true, color: COLORS.success },
-    { key: 'productsSold', icon: Package, isCurrency: false, color: COLORS.accent },
-    { key: 'commissions', icon: Award, isCurrency: true, color: COLORS.danger },
-    { key: 'subscriptions', icon: CreditCard, isCurrency: false, color: COLORS.info }
+    { key: 'revenueServices', icon: Scissors, isCurrency: true, color: COLORS.accent },
+    { key: 'revenuePlans', icon: CreditCard, isCurrency: true, color: COLORS.info },
+    { key: 'revenueProducts', icon: Package, isCurrency: true, color: COLORS.success },
+    { key: 'appointments', icon: Calendar, isCurrency: false, color: COLORS.accent },
+    { key: 'subscriptions', icon: Users, isCurrency: false, color: COLORS.info },
+    { key: 'productsSold', icon: ShoppingBag, isCurrency: false, color: COLORS.success }
   ]
 
   // Métricas auxiliares para gráfico de linha
@@ -402,10 +403,12 @@ export default function ReportsPage() {
   // Coordenadas para SVG da Linha (Evolução)
   const getSvgCoordinates = (dataArr, width = 500, height = 180) => {
     const padding = 15
+    const leftMargin = 45
+    const chartWidth = width - leftMargin
     const chartHeight = height - padding * 2
     return dataArr.map((val, idx) => {
       const divisor = dataArr.length - 1
-      const x = divisor > 0 ? (idx / divisor) * width : width / 2
+      const x = divisor > 0 ? leftMargin + (idx / divisor) * chartWidth : leftMargin + chartWidth / 2
       const y = maxRevenueVal > 0
         ? padding + (chartHeight - (val / maxRevenueVal) * chartHeight)
         : padding + chartHeight
@@ -420,7 +423,7 @@ export default function ReportsPage() {
   const previousPath = previousPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
   const currentAreaPath = currentPoints.length > 0 
-    ? `${currentPath} L ${currentPoints[currentPoints.length - 1].x} 180 L ${currentPoints[0].x} 180 Z` 
+    ? `${currentPath} L ${currentPoints[currentPoints.length - 1].x} 165 L ${currentPoints[0].x} 165 Z` 
     : ''
 
   // Valores acumulados do Donut
@@ -632,21 +635,48 @@ export default function ReportsPage() {
                   </linearGradient>
                 </defs>
 
-                {/* Gridlines horizontais */}
-                {[0, 0.25, 0.5, 0.75, 1].map((r, idx) => {
-                  const y = 15 + r * 150
-                  return (
-                    <line 
-                      key={idx} 
-                      x1="0" 
-                      y1={y} 
-                      x2="500" 
-                      y2={y} 
-                      stroke={isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)'} 
-                      strokeWidth="1" 
-                    />
-                  )
-                })}
+                {/* Helper para renderizar valores no eixo vertical */}
+                {(() => {
+                  const getVerticalLabel = (r) => {
+                    const val = maxRevenueVal * (1 - r)
+                    return 'R$ ' + Math.round(val).toLocaleString('pt-BR')
+                  }
+                  return [0, 0.25, 0.5, 0.75, 1].map((r, idx) => {
+                    const y = 15 + r * 150
+                    return (
+                      <g key={idx}>
+                        <text 
+                          x="5" 
+                          y={y + 3} 
+                          fill={isDark ? '#71717a' : '#a1a1aa'} 
+                          fontSize="7" 
+                          fontWeight="bold"
+                          className="font-mono"
+                        >
+                          {getVerticalLabel(r)}
+                        </text>
+                        <line 
+                          x1="45" 
+                          y1={y} 
+                          x2="500" 
+                          y2={y} 
+                          stroke={isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)'} 
+                          strokeWidth="1" 
+                        />
+                      </g>
+                    )
+                  })
+                })()}
+
+                {/* Linha vertical do eixo Y */}
+                <line 
+                  x1="45" 
+                  y1="15" 
+                  x2="45" 
+                  y2="165" 
+                  stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} 
+                  strokeWidth="1" 
+                />
 
                 {/* Área preenchida com gradiente (Período Atual) */}
                 {currentAreaPath && (
@@ -699,14 +729,36 @@ export default function ReportsPage() {
                 {lineChartHoverIndex !== null && currentPoints[lineChartHoverIndex] && (
                   <line
                     x1={currentPoints[lineChartHoverIndex].x}
-                    y1="0"
+                    y1="15"
                     x2={currentPoints[lineChartHoverIndex].x}
-                    y2="180"
+                    y2="165"
                     stroke="rgba(245, 158, 11, 0.3)"
                     strokeWidth="1"
                     strokeDasharray="2 2"
                   />
                 )}
+
+                {/* Marcadores do eixo X dentro do SVG para alinhamento perfeito */}
+                {reportData.revenueChart.labels.map((label, idx) => {
+                  const step = timeFilter === 'year' ? 2 : 4
+                  if (idx % step !== 0 && idx !== reportData.revenueChart.labels.length - 1) return null
+                  const p = currentPoints[idx]
+                  if (!p) return null
+                  return (
+                    <text
+                      key={idx}
+                      x={p.x}
+                      y="178"
+                      textAnchor="middle"
+                      fill={isDark ? '#71717a' : '#a1a1aa'} 
+                      fontSize="7" 
+                      fontWeight="bold"
+                      className="font-mono"
+                    >
+                      {label}
+                    </text>
+                  )
+                })}
               </svg>
 
               {/* Tooltip Overlay Dinâmico do Gráfico */}
@@ -736,13 +788,6 @@ export default function ReportsPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
-
-            {/* Marcadores do eixo X */}
-            <div className="flex justify-between px-2 pt-2 border-t border-zinc-900/30 text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
-              {reportData.revenueChart.labels.filter((_, idx) => idx % (timeFilter === 'year' ? 2 : 3) === 0).map((label, idx) => (
-                <span key={idx}>{label}</span>
-              ))}
             </div>
           </div>
 
