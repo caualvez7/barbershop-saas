@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabase'
+import { supabaseCustomer as supabase } from '../../../../lib/supabase-customer.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Sparkles, 
@@ -30,29 +30,10 @@ export default function PlansPage() {
     const loadData = async () => {
       let user = null
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        user = session?.user
-        if (!user) {
-          const { data: { user: fetchedUser } } = await supabase.auth.getUser()
-          user = fetchedUser
-        }
+        const { data: { user: fetchedUser } } = await supabase.auth.getUser()
+        user = fetchedUser
       } catch (err) {
-        console.warn('Erro na busca inicial de sessao:', err)
-      }
-
-      // Retry com tolerancia em caso de atraso na inicializacao do cliente
-      if (!user) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        try {
-          const { data: { session: retrySession } } = await supabase.auth.getSession()
-          user = retrySession?.user
-          if (!user) {
-            const { data: { user: retryUser } } = await supabase.auth.getUser()
-            user = retryUser
-          }
-        } catch (err) {
-          console.warn('Erro no retry de sessao:', err)
-        }
+        console.warn('Erro na busca de sessao:', err)
       }
 
       if (!user) { 
@@ -172,8 +153,8 @@ export default function PlansPage() {
       plan_name: plan.name,
       price: plan.price,
       status: 'pending',
-      starts_at: new Date(),
-      expires_at: expiresAt,
+      starts_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString(),
     })
 
     if (error) { 

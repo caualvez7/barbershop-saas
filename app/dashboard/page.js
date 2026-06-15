@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../components/DashboardLayout.jsx'
 import Link from 'next/link'
@@ -351,7 +351,7 @@ export default function Dashboard() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [loading, setLoading] = useState(true)
   const [appointments, setAppointments] = useState([])
   const [barbers, setBarbers] = useState([])
@@ -369,33 +369,38 @@ export default function Dashboard() {
     return `${year}-${month}-${dateVal}`
   })
 
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+      const [apptRes, barbersRes, servicesRes, salesRes, subsRes] = await Promise.all([
+        supabase.from('appointments').select('*, services(name, price), barbers(name)').eq('barbershop_id', barbershop.id).order('time', { ascending: true }),
+        supabase.from('barbers').select('*').eq('barbershop_id', barbershop.id).eq('active', true),
+        supabase.from('services').select('*').eq('barbershop_id', barbershop.id),
+        supabase.from('product_sales').select('*').eq('barbershop_id', barbershop.id),
+        supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id)
+      ])
+
+      setAppointments(apptRes.data || [])
+      setBarbers(barbersRes.data || [])
+      setServices(servicesRes.data || [])
+      setProductSales(salesRes.data || [])
+      setSubscriptions(subsRes.data || [])
+    } catch (err) {
+      console.error('Erro ao carregar dados do dashboard:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [barbershop])
+
   useEffect(() => {
-    if (!barbershop) return
-
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const [apptRes, barbersRes, servicesRes, salesRes, subsRes] = await Promise.all([
-          supabase.from('appointments').select('*, services(name, price), barbers(name)').eq('barbershop_id', barbershop.id).order('time', { ascending: true }),
-          supabase.from('barbers').select('*').eq('barbershop_id', barbershop.id).eq('active', true),
-          supabase.from('services').select('*').eq('barbershop_id', barbershop.id),
-          supabase.from('product_sales').select('*').eq('barbershop_id', barbershop.id),
-          supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id)
-        ])
-
-        setAppointments(apptRes.data || [])
-        setBarbers(barbersRes.data || [])
-        setServices(servicesRes.data || [])
-        setProductSales(salesRes.data || [])
-        setSubscriptions(subsRes.data || [])
-      } catch (err) {
-        console.error('Erro ao carregar dados do dashboard:', err)
-      } finally {
-        setLoading(false)
-      }
+    if (layoutLoading) return
+    if (!barbershop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
     }
     loadData()
-  }, [barbershop])
+  }, [barbershop, layoutLoading, loadData, router])
 
   const updateAppointmentStatus = async (id, status) => {
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)

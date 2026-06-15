@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '../../../lib/supabase.js'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -66,11 +66,18 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Estados do loading de ações de vendas
   const [salesActionLoading, setSalesActionLoading] = useState({})
 
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   // Carregar dados
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!barbershop) return
     try {
       setLoading(true)
@@ -80,6 +87,8 @@ export default function ProductsPage() {
         .select('*')
         .eq('barbershop_id', barbershop.id)
         .order('created_at', { ascending: false })
+
+      if (!isMountedRef.current) return
 
       if (productsError) {
         console.warn('Erro ao carregar produtos (tabela pode não existir):', productsError.message)
@@ -92,7 +101,7 @@ export default function ProductsPage() {
         // Carrega pedidos simulados locais do localStorage
         let savedLocalOrders = []
         if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`mock_orders_${barbershop.slug}`)
+          const saved = localStorage.getItem(`barber_mock_orders_${barbershop.slug}`)
           if (saved) {
             try {
               savedLocalOrders = JSON.parse(saved)
@@ -109,6 +118,8 @@ export default function ProductsPage() {
           .eq('barbershop_id', barbershop.id)
           .order('created_at', { ascending: false })
 
+        if (!isMountedRef.current) return
+
         if (!salesError && salesData && salesData.length > 0) {
           // Carregar clientes relacionados manualmente para evitar erros de join PostgREST complexos
           const customerIds = [...new Set(salesData.map(sale => sale.customer_id).filter(Boolean))]
@@ -118,6 +129,8 @@ export default function ProductsPage() {
             customerIds.length > 0 ? supabase.from('customers').select('*').in('id', customerIds) : { data: [] },
             productIds.length > 0 ? supabase.from('products').select('*').in('id', productIds) : { data: [] }
           ])
+
+          if (!isMountedRef.current) return
 
           const customerMap = {}
           customersResponse.data?.forEach(c => { customerMap[c.id] = c })
@@ -139,19 +152,22 @@ export default function ProductsPage() {
         }
       }
     } catch (err) {
+      if (!isMountedRef.current) return
       console.error('Erro geral no carregamento:', err)
       setDatabaseWarning(true)
-      loadMockData(1, null)
+      loadMockData(barbershop.id, barbershop.slug)
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
-  }
+  }, [barbershop])
 
   // Carregar dados simulados em caso de falta de tabela no Supabase
   const loadMockData = (shopId, slug) => {
     let savedLocalProducts = []
     if (typeof window !== 'undefined' && slug) {
-      const saved = localStorage.getItem(`mock_products_${slug}`)
+      const saved = localStorage.getItem(`barber_mock_products_${slug}`)
       if (saved) {
         try {
           savedLocalProducts = JSON.parse(saved)
@@ -209,9 +225,9 @@ export default function ProductsPage() {
     ]
 
     const productsList = savedLocalProducts.length > 0 ? savedLocalProducts : defaultMockProducts
-    setProducts(productsList)
+    if (isMountedRef.current) setProducts(productsList)
     if (typeof window !== 'undefined' && slug && savedLocalProducts.length === 0) {
-      localStorage.setItem(`mock_products_${slug}`, JSON.stringify(defaultMockProducts))
+      localStorage.setItem(`barber_mock_products_${slug}`, JSON.stringify(defaultMockProducts))
     }
 
     const mockProducts = productsList
@@ -273,7 +289,7 @@ export default function ProductsPage() {
     // Mesclar vendas locais do localStorage se houver slug no sandbox
     let savedLocalOrders = []
     if (typeof window !== 'undefined' && slug) {
-      const saved = localStorage.getItem(`mock_orders_${slug}`)
+      const saved = localStorage.getItem(`barber_mock_orders_${slug}`)
       if (saved) {
         try {
           savedLocalOrders = JSON.parse(saved)
@@ -283,12 +299,12 @@ export default function ProductsPage() {
       }
     }
     const localOnly = savedLocalOrders.filter(lo => !mockSales.some(db => db.id === lo.id))
-    setSales([...mockSales, ...localOnly])
+    if (isMountedRef.current) setSales([...mockSales, ...localOnly])
   }
 
   useEffect(() => {
     loadData()
-  }, [barbershop])
+  }, [loadData])
 
   // Abrir modal de criação
   const openCreateModal = () => {
@@ -370,7 +386,7 @@ export default function ProductsPage() {
       }
       setProducts(updatedProducts)
       if (typeof window !== 'undefined' && barbershop?.slug) {
-        localStorage.setItem(`mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
+        localStorage.setItem(`barber_mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
       }
       setSaving(false)
       setModalOpen(false)
@@ -412,7 +428,7 @@ export default function ProductsPage() {
       const updatedProducts = products.filter(p => p.id !== productToDelete.id)
       setProducts(updatedProducts)
       if (typeof window !== 'undefined' && barbershop?.slug) {
-        localStorage.setItem(`mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
+        localStorage.setItem(`barber_mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
       }
       setDeleting(false)
       setDeleteModalOpen(false)
@@ -464,7 +480,7 @@ export default function ProductsPage() {
       // Salva de volta nas ordens simuladas do localStorage
       if (typeof window !== 'undefined' && barbershop?.slug) {
         const localOrders = updatedSales.filter(s => s.id.toString().startsWith('order-') || s.id.toString().startsWith('mock-'))
-        localStorage.setItem(`mock_orders_${barbershop.slug}`, JSON.stringify(localOrders))
+        localStorage.setItem(`barber_mock_orders_${barbershop.slug}`, JSON.stringify(localOrders))
       }
       setSalesActionLoading(prev => ({ ...prev, [saleId]: false }))
       return

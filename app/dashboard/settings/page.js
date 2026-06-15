@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
@@ -22,7 +22,7 @@ export default function SettingsPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const { barbershop: initialBarbershop } = useDashboard()
+  const { barbershop: initialBarbershop, loading: layoutLoading } = useDashboard()
   const [barbershop, setBarbershop] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -41,39 +41,45 @@ export default function SettingsPage() {
     DAYS.map(d => ({ day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }))
   )
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!initialBarbershop) return
+    try {
+      setLoading(true)
+      setBarbershop(initialBarbershop)
+      setName(initialBarbershop.name || '')
+      setOwnerName(initialBarbershop.owner_name || '')
+      setPhone(initialBarbershop.phone || '')
+      setCommercialEmail(initialBarbershop.commercial_email || '')
 
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        setBarbershop(initialBarbershop)
-        setName(initialBarbershop.name || '')
-        setOwnerName(initialBarbershop.owner_name || '')
-        setPhone(initialBarbershop.phone || '')
-        setCommercialEmail(initialBarbershop.commercial_email || '')
+      const { data: hoursData } = await supabase
+        .from('business_hours')
+        .select('*')
+        .eq('barbershop_id', initialBarbershop.id)
 
-        const { data: hoursData } = await supabase
-          .from('business_hours')
-          .select('*')
-          .eq('barbershop_id', initialBarbershop.id)
-
-        if (hoursData && hoursData.length > 0) {
-          setHours(DAYS.map(d => {
-            const existing = hoursData.find(h => h.day_of_week === d.value)
-            return existing
-              ? { day_of_week: d.value, is_open: existing.is_open, open_time: existing.open_time.slice(0, 5), close_time: existing.close_time.slice(0, 5) }
-              : { day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }
-          }))
-        }
-      } catch (err) {
-        console.error('Erro ao carregar configurações:', err)
-      } finally {
-        setLoading(false)
+      if (hoursData && hoursData.length > 0) {
+        setHours(DAYS.map(d => {
+          const existing = hoursData.find(h => h.day_of_week === d.value)
+          return existing
+            ? { day_of_week: d.value, is_open: existing.is_open, open_time: existing.open_time.slice(0, 5), close_time: existing.close_time.slice(0, 5) }
+            : { day_of_week: d.value, is_open: false, open_time: '09:00', close_time: '19:00' }
+        }))
       }
+    } catch (err) {
+      console.error('Erro ao carregar configurações:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [initialBarbershop])
+
+  useEffect(() => {
+    if (layoutLoading) return
+    if (!initialBarbershop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
     }
     loadData()
-  }, [initialBarbershop])
+  }, [initialBarbershop, layoutLoading, loadData, router])
 
   const updateHour = (dayValue, field, value) => {
     setHours(prev => prev.map(h =>

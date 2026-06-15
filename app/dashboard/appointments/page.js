@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { useEffect, useState, useRef } from 'react'
+import { supabaseBarber as supabase } from '../../../lib/supabase-barber'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,21 +12,36 @@ export default function AppointmentsPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [today, setToday] = useState('')
   const [activeTab, setActiveTab] = useState('Todos')
   const [searchQuery, setSearchQuery] = useState('')
 
+  const isMountedRef = useRef(true)
   useEffect(() => {
-    if (!barbershop) return
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (layoutLoading) return
+    if (!barbershop) {
+      if (isMountedRef.current) setLoading(false)
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) router.push('/login')
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
 
     const loadData = async () => {
       try {
         setLoading(true)
         const todayDate = new Date().toISOString().split('T')[0]
-        setToday(todayDate)
+        if (isMountedRef.current) setToday(todayDate)
 
         // Buscar todos os agendamentos do dia atual para ter uma visão completa
         const { data, error } = await supabase
@@ -36,15 +51,19 @@ export default function AppointmentsPage() {
           .eq('date', todayDate)
           .order('time', { ascending: true })
 
+        if (!isMountedRef.current) return
+
         if (!error) setAppointments(data || [])
       } catch (err) {
         console.error('Erro ao carregar agendamentos:', err)
       } finally {
-        setLoading(false)
+        if (isMountedRef.current) {
+          setLoading(false)
+        }
       }
     }
     loadData()
-  }, [barbershop])
+  }, [barbershop, layoutLoading, router])
 
   const formatDate = (dateStr) => {
     const [year, month, day] = dateStr.split('-')

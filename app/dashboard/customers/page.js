@@ -27,7 +27,7 @@ export default function CustomersPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [subscriptions, setSubscriptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -35,7 +35,12 @@ export default function CustomersPage() {
   const [actionLoading, setActionLoading] = useState({}) // armazena loading de ações por ID de subscription
 
   useEffect(() => {
-    if (!barbershop) return
+    if (layoutLoading) return
+    if (!barbershop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
+    }
 
     const loadData = async () => {
       try {
@@ -45,7 +50,7 @@ export default function CustomersPage() {
           .from('customers')
           .select('*')
           .eq('barbershop_id', barbershop.id)
-          .order('created_at', { ascending: false })
+          .order('name', { ascending: true })
 
         if (customersError) throw customersError
 
@@ -103,7 +108,7 @@ export default function CustomersPage() {
       }
     }
     loadData()
-  }, [barbershop])
+  }, [barbershop, layoutLoading, router])
 
   // Limpar número do WhatsApp para o link wa.me
   const getWhatsAppLink = (phone) => {

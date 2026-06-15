@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
@@ -27,7 +27,7 @@ export default function ServicesPage() {
   const isDark = theme === 'dark'
 
   // Estados principais
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -47,7 +47,7 @@ export default function ServicesPage() {
   const [deleting, setDeleting] = useState(false)
 
   // Carregar serviços e dados da barbearia
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!barbershop) return
     try {
       setLoading(true)
@@ -67,11 +67,17 @@ export default function ServicesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [barbershop])
 
   useEffect(() => {
+    if (layoutLoading) return
+    if (!barbershop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
+    }
     loadData()
-  }, [barbershop])
+  }, [barbershop, layoutLoading, loadData, router])
 
   // Abrir modal de criação
   const openCreateModal = () => {

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabase'
+import { supabaseCustomer as supabase } from '../../../../lib/supabase-customer.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Sparkles, 
@@ -119,42 +119,30 @@ export default function SchedulingPage() {
   const [cardCvv, setCardCvv] = useState('')
   const [pixCopied, setPixCopied] = useState(false)
 
+  const paymentTimerRef = useRef(null)
+  const pixTimerRef = useRef(null)
+
   useEffect(() => {
+    let isMounted = true
     const loadData = async () => {
       let user = null
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        user = session?.user
-        if (!user) {
-          const { data: { user: fetchedUser } } = await supabase.auth.getUser()
-          user = fetchedUser
-        }
+        const { data: { user: fetchedUser } } = await supabase.auth.getUser()
+        if (!isMounted) return
+        user = fetchedUser
       } catch (err) {
-        console.warn('Erro na busca inicial de sessao:', err)
-      }
-
-      // Retry com tolerancia em caso de atraso na inicializacao do cliente
-      if (!user) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        try {
-          const { data: { session: retrySession } } = await supabase.auth.getSession()
-          user = retrySession?.user
-          if (!user) {
-            const { data: { user: retryUser } } = await supabase.auth.getUser()
-            user = retryUser
-          }
-        } catch (err) {
-          console.warn('Erro no retry de sessao:', err)
-        }
+        if (isMounted) console.warn('Erro na busca de sessao:', err)
       }
 
       if (!user) { 
-        router.push(`/barber/${slug}/auth`)
+        if (isMounted) router.push(`/barber/${slug}/auth`)
         return 
       }
 
       const { data: shopData } = await supabase
         .from('barbershops').select('*').eq('slug', slug).single()
+
+      if (!isMounted) return
 
       if (!shopData) { 
         setLoading(false)
@@ -168,12 +156,16 @@ export default function SchedulingPage() {
         .eq('barbershop_id', shopData.id)
         .maybeSingle()
 
+      if (!isMounted) return
+
       if (!customerData) {
         const { data: otherProfiles } = await supabase
           .from('customers')
           .select('name, whatsapp')
           .eq('user_id', user.id)
           .limit(1)
+
+        if (!isMounted) return
 
         const name = otherProfiles?.[0]?.name || user.email?.split('@')[0] || 'Cliente'
         const whatsapp = otherProfiles?.[0]?.whatsapp || ''
@@ -190,6 +182,8 @@ export default function SchedulingPage() {
           .select()
           .single()
 
+        if (!isMounted) return
+
         if (!insertError && newCustomer) {
           customerData = newCustomer
         } else {
@@ -201,6 +195,8 @@ export default function SchedulingPage() {
             .eq('barbershop_id', shopData.id)
             .maybeSingle()
 
+          if (!isMounted) return
+
           if (fallbackCustomer) {
             customerData = fallbackCustomer
           } else {
@@ -210,6 +206,7 @@ export default function SchedulingPage() {
         }
       }
 
+      if (!isMounted) return
 
       const [
         { data: servicesData },
@@ -231,6 +228,8 @@ export default function SchedulingPage() {
           .catch(err => ({ data: null, error: err }))
       ])
 
+      if (!isMounted) return
+
       setShop(shopData)
       setCustomer(customerData)
       setServices(servicesData || [])
@@ -245,7 +244,7 @@ export default function SchedulingPage() {
         console.warn('Produtos indisponíveis no banco, ativando fallback local.')
         let savedLocalProducts = []
         if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`mock_products_${shopData.slug}`)
+          const saved = localStorage.getItem(`customer_mock_products_${shopData.slug}`)
           if (saved) {
             try {
               savedLocalProducts = JSON.parse(saved)
@@ -301,20 +300,20 @@ export default function SchedulingPage() {
             }
           ]
           if (typeof window !== 'undefined') {
-            localStorage.setItem(`mock_products_${shopData.slug}`, JSON.stringify(productsList))
+            localStorage.setItem(`customer_mock_products_${shopData.slug}`, JSON.stringify(productsList))
           }
         }
       }
-      setProducts(productsList)
+      if (isMounted) setProducts(productsList)
 
       // Carregar pedidos do cliente logado
       let savedLocalOrders = []
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(`mock_orders_${slug}`)
+        const saved = localStorage.getItem(`customer_mock_orders_${slug}`)
         if (saved) {
           try {
             savedLocalOrders = JSON.parse(saved)
-            setMockLocalOrders(savedLocalOrders)
+            if (isMounted) setMockLocalOrders(savedLocalOrders)
           } catch (e) {
             console.error('Erro ao ler mock_orders:', e)
           }
@@ -328,11 +327,16 @@ export default function SchedulingPage() {
           .eq('customer_id', customerData.id)
           .order('created_at', { ascending: false })
 
+        if (!isMounted) return
+
         if (salesError) throw salesError
 
         if (salesData && salesData.length > 0) {
           const productIds = [...new Set(salesData.map(s => s.product_id).filter(Boolean))]
           const { data: pData } = await supabase.from('products').select('*').in('id', productIds)
+          
+          if (!isMounted) return
+
           const pMap = {}
           pData?.forEach(p => { pMap[p.id] = p })
 
@@ -342,18 +346,24 @@ export default function SchedulingPage() {
           }))
           
           const localOnly = savedLocalOrders.filter(lo => !mergedSales.some(db => db.id === lo.id))
-          setCustomerOrders([...mergedSales, ...localOnly])
+          if (isMounted) setCustomerOrders([...mergedSales, ...localOnly])
         } else {
-          setCustomerOrders(savedLocalOrders)
+          if (isMounted) setCustomerOrders(savedLocalOrders)
         }
       } catch (err) {
         console.warn('Erro ao carregar vendas do banco:', err.message)
-        setCustomerOrders(savedLocalOrders)
+        if (isMounted) setCustomerOrders(savedLocalOrders)
       }
 
-      setLoading(false)
+      if (isMounted) setLoading(false)
     }
     if (slug) loadData()
+
+    return () => {
+      isMounted = false
+      if (paymentTimerRef.current) clearTimeout(paymentTimerRef.current)
+      if (pixTimerRef.current) clearTimeout(pixTimerRef.current)
+    }
   }, [slug])
 
   // Lógica de 3D Card Hover
@@ -451,8 +461,8 @@ export default function SchedulingPage() {
       plan_name: plan.name,
       price: plan.price,
       status: 'pending',
-      starts_at: new Date(),
-      expires_at: expiresAt,
+      starts_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString(),
     })
 
     if (error) { 
@@ -470,7 +480,7 @@ export default function SchedulingPage() {
     const updatedMock = [newOrder, ...mockLocalOrders]
     setMockLocalOrders(updatedMock)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`mock_orders_${slug}`, JSON.stringify(updatedMock))
+      localStorage.setItem(`customer_mock_orders_${slug}`, JSON.stringify(updatedMock))
     }
   }
 
@@ -550,7 +560,10 @@ export default function SchedulingPage() {
     setCheckoutStep('online_processing')
     setPurchaseError('')
     
-    setTimeout(() => {
+    if (paymentTimerRef.current) {
+      clearTimeout(paymentTimerRef.current)
+    }
+    paymentTimerRef.current = setTimeout(() => {
       handlePurchaseProduct()
     }, 1500)
   }
@@ -1845,8 +1858,11 @@ export default function SchedulingPage() {
                             onClick={() => {
                               if (typeof window !== 'undefined') {
                                 navigator.clipboard.writeText('00020101021226830014br.gov.bcb.pix256132026barber-gold-studio-purchase-test-payload');
+                                if (pixTimerRef.current) {
+                                  clearTimeout(pixTimerRef.current);
+                                }
                                 setPixCopied(true);
-                                setTimeout(() => setPixCopied(false), 2000);
+                                pixTimerRef.current = setTimeout(() => setPixCopied(false), 2000);
                               }
                             }}
                             className="p-2 bg-zinc-900 border border-zinc-800 text-zinc-455 hover:text-white rounded-xl transition-colors cursor-pointer flex-shrink-0"

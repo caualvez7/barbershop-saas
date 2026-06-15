@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Scissors, Sparkles, User, Mail, Lock, Store, AlertCircle, ChevronRight } from 'lucide-react'
-import { supabase } from '../../lib/supabase.js'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 
 function RegisterContent() {
   const searchParams = useSearchParams()
@@ -18,6 +18,7 @@ function RegisterContent() {
   const [ownerName, setOwnerName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [registered, setRegistered] = useState(false)
 
   const planLabels = { 
     basic: 'Plano Básico — R$29/mês', 
@@ -88,7 +89,55 @@ function RegisterContent() {
       return
     }
 
-    router.push(`/checkout?plan=${plan}`)
+    if (data.session) {
+      router.push(`/checkout?plan=${plan}`)
+    } else {
+      setRegistered(true)
+      setLoading(false)
+    }
+  }
+
+  if (registered) {
+    return (
+      <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans selection:bg-amber-500/35 selection:text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-amber-500/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+        <header className="px-6 py-5 border-b border-zinc-900/60 backdrop-blur-md bg-black/20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 cursor-pointer text-white no-underline">
+            <Scissors className="w-5 h-5 text-amber-500 transform rotate-90" />
+            <span className="text-md font-bold tracking-tight">Barber<span className="text-amber-500">ShopBR</span></span>
+          </Link>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-4 py-16">
+          <motion.div 
+            initial={{ opacity: 0, y: 15, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="w-full max-w-[440px] text-center"
+          >
+            <div className="p-8 rounded-2xl border border-zinc-850 bg-zinc-950/80 backdrop-blur-md shadow-2xl flex flex-col items-center gap-6">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                <Mail size={32} className="animate-pulse" />
+              </div>
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">Verifique seu e-mail</h1>
+              <p className="text-zinc-400 text-xs font-light leading-relaxed">
+                Enviamos um link de confirmação para <strong className="text-white font-semibold">{email}</strong>. 
+                Por favor, verifique sua caixa de entrada (e pasta de spam) e clique no link para ativar sua conta antes de continuar para o pagamento.
+              </p>
+              <div className="w-full border-b border-zinc-900" />
+              <button 
+                onClick={() => router.push('/login')}
+                className="w-full py-3 rounded-xl text-xs font-bold text-black bg-gradient-to-r from-amber-500 to-yellow-500 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Ir para o Login</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </motion.div>
+        </div>
+        <footer className="py-6 text-center border-t border-zinc-950 bg-black/10">
+          <p className="text-[10px] uppercase font-bold text-zinc-650 tracking-widest">&copy; 2026 BarberShopBR</p>
+        </footer>
+      </div>
+    )
   }
 
   return (

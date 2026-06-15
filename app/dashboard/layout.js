@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase.js'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 import { ThemeContext, DashboardContext } from '../components/DashboardLayout.jsx'
 
 export default function DashboardRootLayout({ children }) {
@@ -11,6 +11,11 @@ export default function DashboardRootLayout({ children }) {
   const [session, setSession] = useState(null)
   const [barbershop, setBarbershop] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  const barbershopRef = useRef(barbershop)
+  useEffect(() => {
+    barbershopRef.current = barbershop
+  }, [barbershop])
 
   useEffect(() => {
     const saved = localStorage.getItem('dashboard-theme')
@@ -88,7 +93,9 @@ export default function DashboardRootLayout({ children }) {
             return
           }
 
-          setBarbershop(shopData)
+          if (shopData?.id !== barbershopRef.current?.id) {
+            setBarbershop(shopData)
+          }
         } catch (err) {
           console.error('Erro ao sincronizar barbearia após mudança de auth:', err)
         }
@@ -98,7 +105,7 @@ export default function DashboardRootLayout({ children }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [])
 
   if (loading) {
     return (

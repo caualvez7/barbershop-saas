@@ -125,7 +125,7 @@ export default function DashboardLayout({ children }) {
         // 3. Buscar pedidos pendentes de retirada no localStorage
         let localOrdersList = []
         if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`mock_orders_${barbershop.slug}`)
+          const saved = localStorage.getItem(`barber_mock_orders_${barbershop.slug}`)
           if (saved) {
             try {
               const orders = JSON.parse(saved)

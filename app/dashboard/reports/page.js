@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabase.js'
+import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -51,7 +51,7 @@ export default function ReportsPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [loading, setLoading] = useState(true)
 
   // Estados dos Filtros
@@ -60,6 +60,25 @@ export default function ReportsPage() {
   const [selectedYear, setSelectedYear] = useState('2026')
   const [startDate, setStartDate] = useState('2026-06-01')
   const [endDate, setEndDate] = useState('2026-06-30')
+  const [inputStartDate, setInputStartDate] = useState('2026-06-01')
+  const [inputEndDate, setInputEndDate] = useState('2026-06-30')
+
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Debounce para os inputs de data customizados
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStartDate(inputStartDate)
+      setEndDate(inputEndDate)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [inputStartDate, inputEndDate])
 
   // Dados Ativos (Gerados/Simulados com base nos filtros)
   const [reportData, setReportData] = useState(null)
@@ -117,7 +136,7 @@ export default function ReportsPage() {
   }
 
   // Função para carregar dados reais e consolidar estatísticas
-  const loadRealReportData = async () => {
+  const loadRealReportData = useCallback(async () => {
     if (!barbershop) return
     try {
       setLoading(true)
@@ -125,7 +144,6 @@ export default function ReportsPage() {
         timeFilter, selectedMonth, selectedYear, startDate, endDate
       )
 
-      // Buscar dados de ambos os períodos em paralelo
       const [
         currentApptsRes,
         currentSalesRes,
@@ -146,23 +164,28 @@ export default function ReportsPage() {
         supabase.from('services').select('*').eq('barbershop_id', barbershop.id)
       ])
 
+      if (!isMountedRef.current) return
+
       const appts = currentApptsRes.data || []
+      const sales = currentSalesRes.data || []
+      const subs = currentSubsRes.data || []
+      const prevApptsList = previousApptsRes.data || []
+      const prevSalesList = previousSalesRes.data || []
+      const prevSubsList = previousSubsRes.data || []
+
       // Helper para calcular faturamento
       const getRevenueFromServices = (list) => list.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').reduce((sum, a) => sum + Number(a.services?.price || 0), 0)
       const getRevenueFromProducts = (list) => list.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + Number(s.price_at_purchase || 0) * (s.quantity || 1), 0)
       const getRevenueFromPlans = (list) => list.filter(sub => sub.status === 'active').reduce((sum, s) => sum + Number(s.price || 99.90), 0)
 
-      // Faturamento Atual
       const revenueFromServices = getRevenueFromServices(appts)
       const revenueFromProducts = getRevenueFromProducts(sales)
       const revenueFromPlans = getRevenueFromPlans(subs)
 
-      // Faturamento Anterior
       const prevRevenueFromServices = getRevenueFromServices(prevApptsList)
       const prevRevenueFromProducts = getRevenueFromProducts(prevSalesList)
       const prevRevenueFromPlans = getRevenueFromPlans(prevSubsList)
 
-      // Quantidades Atuais e Anteriores (Apenas concluídos/confirmados/pagos)
       const totalApptsCount = appts.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').length
       const prevApptsCount = prevApptsList.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').length
 
@@ -172,19 +195,6 @@ export default function ReportsPage() {
       const activeSubsCount = subs.filter(sub => sub.status === 'active').length
       const prevActiveSubsCount = prevSubsList.filter(sub => sub.status === 'active').length
 
-      const getCommissions = (list, barbersList) => {
-        const map = {}
-        barbersList?.forEach(b => { map[b.id] = b.commission_percentage || 35 })
-        return list.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').reduce((sum, a) => {
-          const comm = map[a.barber_id] || 35
-          return sum + (Number(a.services?.price || 0) * comm) / 100
-        }, 0)
-      }
-
-      const totalCommissions = getCommissions(appts, barbersRes.data)
-      const prevCommissions = getCommissions(prevApptsList, barbersRes.data)
-
-      // Cálculo dinâmico do crescimento MoM/período anterior
       const calcChange = (curr, prev) => {
         if (prev === 0) return curr > 0 ? 100 : 0
         return ((curr - prev) / prev) * 100
@@ -199,104 +209,62 @@ export default function ReportsPage() {
         productsSold: { value: totalProductsSold, change: calcChange(totalProductsSold, prevProductsSold), isPositive: totalProductsSold >= prevProductsSold, label: 'Produtos Vendidos' }
       }
 
-      // Helper to generate dates array
       const getDatesInRange = (startDateStr, endDateStr) => {
         const dates = []
         let curr = new Date(startDateStr + 'T12:00:00')
         const end = new Date(endDateStr + 'T12:00:00')
         while (curr <= end) {
-          dates.push(new Date(curr))
+          dates.push(curr.toISOString().split('T')[0])
           curr.setDate(curr.getDate() + 1)
         }
         return dates
       }
 
-      // Gráfico de linha/área (Evolução diária ou mensal)
-      const revenueLabels = []
-      const revenueCurrent = []
-      const revenuePrevious = []
+      const datesList = getDatesInRange(currentStart, currentEnd)
+      const revenueLabels = datesList.map(d => {
+        const parts = d.split('-')
+        return `${parts[2]}/${parts[1]}`
+      })
 
-      if (timeFilter === 'year') {
-        MONTHS.forEach((m, idx) => {
-          revenueLabels.push(m.slice(0, 3))
-          
-          const monthAppts = appts.filter(a => {
-            const d = new Date(a.date + 'T12:00:00')
-            return d.getMonth() === idx && (a.status === 'Concluído' || a.status === 'Confirmado')
-          })
-          const monthSales = sales.filter(s => {
-            const d = new Date(s.created_at)
-            return d.getMonth() === idx && s.status !== 'cancelled'
-          })
-          revenueCurrent.push(getRevenueFromServices(monthAppts) + getRevenueFromProducts(monthSales))
+      const revenueCurrent = datesList.map(dateStr => {
+        const dayAppts = appts.filter(a => a.date === dateStr)
+        const daySales = sales.filter(s => s.created_at && s.created_at.startsWith(dateStr))
+        const daySubs = subs.filter(sub => sub.created_at && sub.created_at.startsWith(dateStr))
+        return getRevenueFromServices(dayAppts) + getRevenueFromProducts(daySales) + getRevenueFromPlans(daySubs)
+      })
 
-          const prevMonthAppts = prevApptsList.filter(a => {
-            const d = new Date(a.date + 'T12:00:00')
-            return d.getMonth() === idx && (a.status === 'Concluído' || a.status === 'Confirmado')
-          })
-          const prevMonthSales = prevSalesList.filter(s => {
-            const d = new Date(s.created_at)
-            return d.getMonth() === idx && s.status !== 'cancelled'
-          })
-          revenuePrevious.push(getRevenueFromServices(prevMonthAppts) + getRevenueFromProducts(prevMonthSales))
-        })
-      } else {
-        const currentDates = getDatesInRange(currentStart, currentEnd)
-        const previousDates = getDatesInRange(previousStart, previousEnd)
-        
-        currentDates.forEach((d, idx) => {
-          const dayStr = String(d.getDate()).padStart(2, '0')
-          const monthStr = String(d.getMonth() + 1).padStart(2, '0')
-          revenueLabels.push(`${dayStr}/${monthStr}`)
-          
-          const currentDateStr = d.toISOString().split('T')[0]
-          const dayAppts = appts.filter(a => a.date === currentDateStr)
-          const daySales = sales.filter(s => s.created_at && s.created_at.startsWith(currentDateStr) && s.status !== 'cancelled')
-          revenueCurrent.push(getRevenueFromServices(dayAppts) + getRevenueFromProducts(daySales))
-
-          const prevD = previousDates[idx]
-          if (prevD) {
-            const prevDateStr = prevD.toISOString().split('T')[0]
-            const prevDayAppts = prevApptsList.filter(a => a.date === prevDateStr)
-            const prevDaySales = prevSalesList.filter(s => s.created_at && s.created_at.startsWith(prevDateStr) && s.status !== 'cancelled')
-            revenuePrevious.push(getRevenueFromServices(prevDayAppts) + getRevenueFromProducts(prevDaySales))
-          } else {
-            revenuePrevious.push(0)
-          }
-        })
-      }
+      const prevDatesList = getDatesInRange(previousStart, previousEnd)
+      const revenuePrevious = datesList.map((_, idx) => {
+        const prevDateStr = prevDatesList[idx]
+        if (!prevDateStr) return 0
+        const dayAppts = prevApptsList.filter(a => a.date === prevDateStr)
+        const daySales = prevSalesList.filter(s => s.created_at && s.created_at.startsWith(prevDateStr))
+        const daySubs = prevSubsList.filter(sub => sub.created_at && sub.created_at.startsWith(prevDateStr))
+        return getRevenueFromServices(dayAppts) + getRevenueFromProducts(daySales) + getRevenueFromPlans(daySubs)
+      })
 
       const totalRevenue = revenueFromServices + revenueFromProducts + revenueFromPlans
-
       const distribution = [
         { name: 'Serviços', value: revenueFromServices, percentage: totalRevenue > 0 ? Math.round((revenueFromServices / totalRevenue) * 100) : 0, color: COLORS.accent },
         { name: 'Produtos', value: revenueFromProducts, percentage: totalRevenue > 0 ? Math.round((revenueFromProducts / totalRevenue) * 100) : 0, color: COLORS.success },
         { name: 'Planos', value: revenueFromPlans, percentage: totalRevenue > 0 ? Math.round((revenueFromPlans / totalRevenue) * 100) : 0, color: COLORS.info }
       ]
 
-      const realBarbers = (barbersRes.data || []).map((barber, idx) => {
-        const barberAppts = appts.filter(a => a.barber_id === barber.id)
-        const completedAppts = barberAppts.filter(a => a.status === 'Concluído' || a.status === 'Confirmado')
-        const bRev = completedAppts.reduce((sum, a) => sum + Number(a.services?.price || 0), 0)
-        const bComm = (bRev * (barber.commission_percentage || 35)) / 100
-        const bTicket = completedAppts.length > 0 ? (bRev / completedAppts.length) : 0
-
-        return {
-          name: barber.name,
-          photo: barber.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop',
-          appointments: completedAppts.length,
-          revenue: bRev,
-          commissionPercent: barber.commission_percentage || 35,
-          commissionValue: bComm,
-          ticket: bTicket,
-          ranking: idx + 1,
-          isTopPerformer: false
-        }
+      const barberMap = {}
+      ;(barbersRes.data || []).forEach(b => {
+        barberMap[b.id] = { id: b.id, name: b.name, photo_url: b.photo_url, completedCount: 0, revenue: 0 }
       })
 
-      realBarbers.sort((a, b) => b.revenue - a.revenue)
-      realBarbers.forEach((barber, idx) => {
-        barber.ranking = idx + 1
+      appts.filter(a => a.status === 'Concluído').forEach(appt => {
+        if (barberMap[appt.barber_id]) {
+          barberMap[appt.barber_id].completedCount += 1
+          barberMap[appt.barber_id].revenue += Number(appt.services?.price || 0)
+        }
+      })
+      const realBarbers = Object.values(barberMap).sort((a, b) => b.revenue - a.revenue)
+      const maxBarberRevenue = Math.max(...realBarbers.map(b => b.revenue), 1)
+      realBarbers.forEach(b => {
+        b.revenuePercentage = Math.round((b.revenue / maxBarberRevenue) * 100)
       })
       if (realBarbers.length > 0) {
         realBarbers[0].isTopPerformer = true
@@ -328,48 +296,36 @@ export default function ReportsPage() {
       });
       const realPlans = Object.values(planSubsMap).sort((a, b) => b.revenue - a.revenue)
 
+      if (!isMountedRef.current) return
+
       setReportData({
         kpis,
-        revenueChart: {
-          labels: revenueLabels,
-          current: revenueCurrent,
-          previous: revenuePrevious
-        },
+        revenueChart: { labels: revenueLabels, current: revenueCurrent, previous: revenuePrevious },
         distribution,
         barbers: realBarbers,
         products: realProducts,
         plans: realPlans
       })
     } catch (err) {
-      console.error('Erro no processamento do relatório real:', err)
-      // Se der erro crítico, ainda atualizamos o estado com valores zerados em vez de mock simulado
-      setReportData({
-        kpis: {
-          revenueServices: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Atendimentos' },
-          revenuePlans: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Planos' },
-          revenueProducts: { value: 0, change: 0, isPositive: true, label: 'Faturamento de Produtos' },
-          appointments: { value: 0, change: 0, isPositive: true, label: 'Atendimentos Realizados' },
-          subscriptions: { value: 0, change: 0, isPositive: true, label: 'Planos Assinados' },
-          productsSold: { value: 0, change: 0, isPositive: true, label: 'Produtos Vendidos' }
-        },
-        revenueChart: { labels: ['Sem dados'], current: [0], previous: [0] },
-        distribution: [
-          { name: 'Serviços', value: 0, percentage: 0, color: COLORS.accent },
-          { name: 'Produtos', value: 0, percentage: 0, color: COLORS.success },
-          { name: 'Planos', value: 0, percentage: 0, color: COLORS.info }
-        ],
-        barbers: [],
-        products: [],
-        plans: []
-      })
+      console.error(err)
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
-  }
+  }, [barbershop, timeFilter, selectedMonth, selectedYear, startDate, endDate])
 
   useEffect(() => {
+    if (layoutLoading) return
+    if (!barbershop) {
+      if (isMountedRef.current) setLoading(false)
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) router.push('/login')
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
     loadRealReportData()
-  }, [barbershop, timeFilter, selectedMonth, selectedYear, startDate, endDate])
+  }, [barbershop, layoutLoading, loadRealReportData, router])
 
   if (!reportData) return null
 
@@ -525,15 +481,15 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2 text-xs text-zinc-500 font-bold font-sans">
                 <input
                   type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  value={inputStartDate}
+                  onChange={(e) => setInputStartDate(e.target.value)}
                   className="px-2.5 py-1 bg-zinc-900/60 border border-zinc-900 hover:border-zinc-800 rounded-xl text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer"
                 />
                 <span>até</span>
                 <input
                   type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  value={inputEndDate}
+                  onChange={(e) => setInputEndDate(e.target.value)}
                   className="px-2.5 py-1 bg-zinc-900/60 border border-zinc-900 hover:border-zinc-800 rounded-xl text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer"
                 />
               </div>

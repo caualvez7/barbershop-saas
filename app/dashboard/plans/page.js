@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
@@ -26,7 +26,7 @@ export default function PlansPage() {
   const isDark = theme === 'dark'
 
   // Estados principais
-  const { barbershop: shop } = useDashboard()
+  const { barbershop: shop, loading: layoutLoading } = useDashboard()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -45,7 +45,7 @@ export default function PlansPage() {
   const [deleting, setDeleting] = useState(false)
 
   // Carregar dados
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!shop) return
     try {
       setLoading(true)
@@ -68,11 +68,17 @@ export default function PlansPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop])
 
   useEffect(() => {
+    if (layoutLoading) return
+    if (!shop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
+    }
     loadData()
-  }, [shop])
+  }, [shop, layoutLoading, loadData, router])
 
   // Lógica do Checkbox de Serviços
   const toggleService = (serviceId, serviceName) => {

@@ -1,14 +1,42 @@
 'use client'
 
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Suspense } from 'react'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 
 function CheckoutContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
   const plan = searchParams.get('plan') || 'basic'
+  const [checkingAuth, setCheckingAuth] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push(`/login?redirect=/checkout?plan=${plan}`)
+        } else {
+          setCheckingAuth(false)
+        }
+      } catch (err) {
+        console.error('Erro de autenticação no checkout:', err)
+        router.push(`/login?redirect=/checkout?plan=${plan}`)
+      }
+    }
+    checkAuth()
+  }, [router, plan])
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
+        <div className="w-8 h-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+        <p className="text-slate-500 text-xs font-mono tracking-wider uppercase">Verificando autenticação...</p>
+      </div>
+    )
+  }
 
   const plans = {
     basic: {

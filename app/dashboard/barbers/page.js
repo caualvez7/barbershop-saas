@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
@@ -32,7 +32,7 @@ export default function BarbersPage() {
   const isDark = theme === 'dark'
 
   // Estados principais
-  const { barbershop } = useDashboard()
+  const { barbershop, loading: layoutLoading } = useDashboard()
   const [barbers, setBarbers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -124,7 +124,7 @@ export default function BarbersPage() {
   }
 
   // Carregar dados
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!barbershop) return
     try {
       setLoading(true)
@@ -145,11 +145,17 @@ export default function BarbersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [barbershop])
 
   useEffect(() => {
+    if (layoutLoading) return
+    if (!barbershop) {
+      setLoading(false)
+      const timer = setTimeout(() => router.push('/login'), 3000)
+      return () => clearTimeout(timer)
+    }
     loadData()
-  }, [barbershop])
+  }, [barbershop, layoutLoading, loadData, router])
 
   // Tratar seleção da imagem
   const handlePhotoSelect = (e) => {
