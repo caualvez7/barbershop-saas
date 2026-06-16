@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabase.js'
+import { supabaseCustomer as supabase } from '../../../../lib/supabase-customer.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Scissors, 

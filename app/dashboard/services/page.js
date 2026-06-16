@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '../../../lib/supabase.js'
+import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
 import Link from 'next/link'

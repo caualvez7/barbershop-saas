@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Scissors, Sparkles, Mail, Lock, AlertCircle, ChevronRight } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 
 export default function LoginPage() {
   const router = useRouter()

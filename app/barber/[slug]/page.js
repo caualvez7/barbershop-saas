@@ -1,6 +1,6 @@
 'use client'
 
-import { supabase } from '../../../lib/supabase'
+import { supabaseCustomer as supabase } from '../../../lib/supabase-customer.js'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'

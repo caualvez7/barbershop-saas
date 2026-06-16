@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, createContext, useContext } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   LayoutDashboard, 

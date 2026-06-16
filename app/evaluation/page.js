@@ -1,5 +1,5 @@
 'use client'
-import { supabase } from '../../lib/supabase'
+import { supabaseCustomer as supabase } from '../../lib/supabase-customer.js'
 import { useState } from 'react'
 
 import Card from '../components/ui/Card'

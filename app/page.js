@@ -9,7 +9,7 @@ import {
   MessageSquare, ShieldCheck, BarChart3, Clock, Sparkles
 } from 'lucide-react'
 import Lenis from 'lenis'
-import { supabase } from '../lib/supabase.js'
+import { supabaseCustomer as supabase } from '../lib/supabase-customer.js'
 import ThreeBackground from './components/ThreeBackground.jsx'
 import InteractiveCard from './components/ui/InteractiveCard.jsx'
 import NumberTicker from './components/ui/NumberTicker.jsx'
