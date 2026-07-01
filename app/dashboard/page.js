@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../components/DashboardLayout.jsx'
+import Toast from '../components/Toast'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -358,6 +359,7 @@ export default function Dashboard() {
   const [services, setServices] = useState([])
   const [productSales, setProductSales] = useState([])
   const [subscriptions, setSubscriptions] = useState([])
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   const rollingDays = getRollingDays()
 
@@ -373,11 +375,11 @@ export default function Dashboard() {
     try {
       setLoading(true)
       const [apptRes, barbersRes, servicesRes, salesRes, subsRes] = await Promise.all([
-        supabase.from('appointments').select('*, services(name, price), barbers(name)').eq('barbershop_id', barbershop.id).order('time', { ascending: true }),
-        supabase.from('barbers').select('*').eq('barbershop_id', barbershop.id).eq('active', true),
-        supabase.from('services').select('*').eq('barbershop_id', barbershop.id),
-        supabase.from('product_sales').select('*').eq('barbershop_id', barbershop.id),
-        supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id)
+        supabase.from('appointments').select('id, customer_name, customer_whatsapp, date, time, service_id, barber_id, status, payment_status, payment_method, price, services(name, price), barbers(name)').eq('barbershop_id', barbershop.id).order('time', { ascending: true }),
+        supabase.from('barbers').select('id, name, active').eq('barbershop_id', barbershop.id).eq('active', true),
+        supabase.from('services').select('id, name, price, active').eq('barbershop_id', barbershop.id),
+        supabase.from('product_sales').select('id, product_id, quantity, total_price, payment_status, created_at').eq('barbershop_id', barbershop.id),
+        supabase.from('subscriptions').select('id, plan_name, price, status, created_at').eq('barbershop_id', barbershop.id)
       ])
 
       setAppointments(apptRes.data || [])
@@ -405,7 +407,7 @@ export default function Dashboard() {
   const updateAppointmentStatus = async (id, status) => {
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
     if (error) { 
-      alert('Erro ao atualizar agendamento no Supabase.')
+      setToast({ message: 'Erro ao atualizar agendamento no Supabase: ' + error.message, type: 'error' })
       return 
     }
     setAppointments(prev => prev.map(item => item.id === id ? { ...item, status } : item))
@@ -960,6 +962,11 @@ export default function Dashboard() {
         </div>
 
       </div>
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

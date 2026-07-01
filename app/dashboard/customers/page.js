@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
+import Toast from '../../components/Toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Users, 
@@ -33,6 +34,7 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'active' | 'pending' | 'cancelled'
   const [actionLoading, setActionLoading] = useState({}) // armazena loading de ações por ID de subscription
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   useEffect(() => {
     if (layoutLoading) return
@@ -48,7 +50,7 @@ export default function CustomersPage() {
         // 1. Carregar todos os clientes registrados da barbearia
         const { data: customersData, error: customersError } = await supabase
           .from('customers')
-          .select('*')
+          .select('id, name, email, whatsapp, created_at')
           .eq('barbershop_id', barbershop.id)
           .order('name', { ascending: true })
 
@@ -57,7 +59,7 @@ export default function CustomersPage() {
         // 2. Carregar todas as assinaturas da barbearia
         const { data: subsData, error: subsError } = await supabase
           .from('subscriptions')
-          .select('*')
+          .select('id, customer_id, plan_name, price, status, starts_at, expires_at, created_at')
           .eq('barbershop_id', barbershop.id)
 
         if (subsError) throw subsError
@@ -129,7 +131,7 @@ export default function CustomersPage() {
       .eq('id', subId)
 
     if (error) {
-      alert('Erro ao atualizar status da assinatura: ' + error.message)
+      setToast({ message: 'Erro ao atualizar status da assinatura: ' + error.message, type: 'error' })
       setActionLoading(prev => ({ ...prev, [subId]: false }))
       return
     }
@@ -438,6 +440,11 @@ export default function CustomersPage() {
         )}
 
       </div>
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

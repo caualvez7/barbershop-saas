@@ -134,11 +134,15 @@ export default function ClientLandingPage() {
   const [hours, setHours] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Estados Interativos da UI
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [currentYear, setCurrentYear] = useState(2026)
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear())
+  }, [])
 
   // Carregar dados dinâmicos do Supabase baseados no slug
   useEffect(() => {
@@ -1111,7 +1115,7 @@ export default function ClientLandingPage() {
             </span>
 
             <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wider">
-              © {new Date().getFullYear()} {shop.name}. Todos os direitos reservados.
+              © {currentYear} {shop.name}. Todos os direitos reservados.
             </span>
 
             <span className="text-[10px] text-zinc-500 font-medium flex items-center gap-1">

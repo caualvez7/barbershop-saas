@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
+import Toast from '../../components/Toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings, Save, CheckCircle2, Clock, MapPin, Store } from 'lucide-react'
 
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const [savingHours, setSavingHours] = useState(false)
   const [successInfo, setSuccessInfo] = useState(false)
   const [successHours, setSuccessHours] = useState(false)
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   // campos info
   const [name, setName] = useState('')
@@ -53,7 +55,7 @@ export default function SettingsPage() {
 
       const { data: hoursData } = await supabase
         .from('business_hours')
-        .select('*')
+        .select('id, day_of_week, is_open, open_time, close_time')
         .eq('barbershop_id', initialBarbershop.id)
 
       if (hoursData && hoursData.length > 0) {
@@ -88,7 +90,10 @@ export default function SettingsPage() {
   }
 
   const handleSaveInfo = async () => {
-    if (!name.trim() || !ownerName.trim()) { alert('Nome da barbearia e proprietário são obrigatórios.'); return }
+    if (!name.trim() || !ownerName.trim()) {
+      setToast({ message: 'Nome da barbearia e proprietário são obrigatórios.', type: 'warning' })
+      return
+    }
 
     setSaving(true)
 
@@ -98,7 +103,7 @@ export default function SettingsPage() {
       .eq('id', barbershop.id)
 
     if (error) { 
-      alert('Erro ao salvar informações.')
+      setToast({ message: 'Erro ao salvar informações: ' + error.message, type: 'error' })
       setSaving(false)
       return 
     }
@@ -124,7 +129,7 @@ export default function SettingsPage() {
       .upsert(rows, { onConflict: 'barbershop_id,day_of_week' })
 
     if (error) { 
-      alert('Erro ao salvar horários.')
+      setToast({ message: 'Erro ao salvar horários: ' + error.message, type: 'error' })
       setSavingHours(false)
       return 
     }
@@ -361,6 +366,11 @@ export default function SettingsPage() {
         </div>
 
       </div>
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

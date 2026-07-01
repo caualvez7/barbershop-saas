@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
+import Toast from '../../components/Toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   CreditCard, 
@@ -43,6 +44,7 @@ export default function PlansPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [planToDelete, setPlanToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   // Carregar dados
   const loadData = useCallback(async () => {
@@ -51,14 +53,14 @@ export default function PlansPage() {
       setLoading(true)
       const { data: servicesData } = await supabase
         .from('services')
-        .select('*')
+        .select('id, name, price, active')
         .eq('barbershop_id', shop.id)
 
       setAvailableServices(servicesData || [])
 
       const { data: plansData } = await supabase
         .from('plans')
-        .select('*, plan_services(*)')
+        .select('id, name, price, active, created_at, plan_services(id, plan_id, service_id, discount_percent, benefit_type, service_name)')
         .eq('barbershop_id', shop.id)
         .order('created_at', { ascending: false })
 
@@ -171,7 +173,7 @@ export default function PlansPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao criar plano:', err)
-      alert(`Falha ao criar plano: ${err.message}`)
+      setToast({ message: `Falha ao criar plano: ${err.message}`, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -200,7 +202,7 @@ export default function PlansPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao excluir plano:', err)
-      alert(`Falha ao excluir plano: ${err.message}`)
+      setToast({ message: `Falha ao excluir plano: ${err.message}`, type: 'error' })
     } finally {
       setDeleting(false)
     }
@@ -736,7 +738,11 @@ export default function PlansPage() {
           </div>
         )}
       </AnimatePresence>
-
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

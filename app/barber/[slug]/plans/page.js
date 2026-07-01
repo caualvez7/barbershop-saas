@@ -25,6 +25,11 @@ export default function PlansPage() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
+  const [currentYear, setCurrentYear] = useState(2026)
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear())
+  }, [])
 
   useEffect(() => {
     const loadData = async () => {
@@ -386,7 +391,7 @@ export default function PlansPage() {
         {/* FOOTER */}
         <footer className="py-6 text-center border-t border-white/[0.02] bg-black/30 relative z-10">
           <p className="text-[9px] uppercase font-bold text-zinc-600 tracking-widest">
-            &copy; {new Date().getFullYear()} {shop?.name} &bull; Plataforma BarberShopBR
+            &copy; {currentYear} {shop?.name} &bull; Plataforma BarberShopBR
           </p>
         </footer>
 

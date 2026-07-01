@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
+import Toast from '../../components/Toast'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -45,6 +46,7 @@ export default function ServicesPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [serviceToDelete, setServiceToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   // Carregar serviços e dados da barbearia
   const loadData = useCallback(async () => {
@@ -53,7 +55,7 @@ export default function ServicesPage() {
       setLoading(true)
       const { data, error } = await supabase
         .from('services')
-        .select('*')
+        .select('id, name, description, duration, price, active, created_at')
         .eq('barbershop_id', barbershop.id)
         .order('id', { ascending: true })
 
@@ -82,7 +84,7 @@ export default function ServicesPage() {
   // Abrir modal de criação
   const openCreateModal = () => {
     if (barbershop?.plan === 'basic' && services.length >= 3) {
-      alert('Limite do plano básico atingido! Remova um serviço ou faça upgrade de plano.')
+      setToast({ message: 'Limite do plano básico atingido! Remova um serviço ou faça upgrade de plano.', type: 'warning' })
       return
     }
     setModalMode('create')
@@ -149,7 +151,7 @@ export default function ServicesPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao salvar serviço:', err)
-      alert(`Falha ao salvar serviço: ${err.message}`)
+      setToast({ message: `Falha ao salvar serviço: ${err.message}`, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -178,7 +180,7 @@ export default function ServicesPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao excluir serviço:', err)
-      alert(`Não foi possível excluir o serviço permanentemente.\n\nMotivo: Esse serviço pode estar vinculado a agendamentos de clientes existentes no banco de dados.`)
+      setToast({ message: 'Não foi possível excluir o serviço permanentemente. Motivo: Esse serviço está vinculado a agendamentos de clientes no banco.', type: 'error' })
     } finally {
       setDeleting(false)
     }
@@ -584,7 +586,11 @@ export default function ServicesPage() {
           </div>
         )}
       </AnimatePresence>
-
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

@@ -154,14 +154,14 @@ export default function ReportsPage() {
         barbersRes,
         servicesRes
       ] = await Promise.all([
-        supabase.from('appointments').select('*, services(name, price), barbers(name, photo_url)').eq('barbershop_id', barbershop.id).gte('date', currentStart).lte('date', currentEnd),
-        supabase.from('product_sales').select('*, products(name, brand, price)').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
-        supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
-        supabase.from('appointments').select('*, services(name, price)').eq('barbershop_id', barbershop.id).gte('date', previousStart).lte('date', previousEnd),
-        supabase.from('product_sales').select('*, products(name)').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
-        supabase.from('subscriptions').select('*').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
-        supabase.from('barbers').select('*').eq('barbershop_id', barbershop.id),
-        supabase.from('services').select('*').eq('barbershop_id', barbershop.id)
+        supabase.from('appointments').select('id, status, date, time, barber_id, price, service_id, services(name, price), barbers(name, photo_url)').eq('barbershop_id', barbershop.id).gte('date', currentStart).lte('date', currentEnd),
+        supabase.from('product_sales').select('id, product_id, quantity, total_price, payment_status, created_at, products(name, brand, price)').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
+        supabase.from('subscriptions').select('id, plan_name, price, status, created_at').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
+        supabase.from('appointments').select('id, status, date, price, service_id, services(name, price)').eq('barbershop_id', barbershop.id).gte('date', previousStart).lte('date', previousEnd),
+        supabase.from('product_sales').select('id, product_id, quantity, total_price, payment_status, created_at, products(name)').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
+        supabase.from('subscriptions').select('id, plan_name, price, status, created_at').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
+        supabase.from('barbers').select('id, name, active, commission_percentage').eq('barbershop_id', barbershop.id),
+        supabase.from('services').select('id, name, price, active').eq('barbershop_id', barbershop.id)
       ])
 
       if (!isMountedRef.current) return

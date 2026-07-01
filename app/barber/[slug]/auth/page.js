@@ -35,6 +35,11 @@ export default function ClientAuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [currentYear, setCurrentYear] = useState(2026)
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear())
+  }, [])
 
   useEffect(() => {
     if (!slug) return
@@ -361,7 +366,7 @@ export default function ClientAuthPage() {
         {/* FOOTER */}
         <footer className="py-6 text-center border-t border-white/[0.02] bg-black/30 relative z-10">
           <p className="text-[9px] uppercase font-bold text-zinc-600 tracking-widest font-sans">
-            &copy; {new Date().getFullYear()} {shop.name} &bull; Plataforma BarberShopBR
+            &copy; {currentYear} {shop.name} &bull; Plataforma BarberShopBR
           </p>
         </footer>
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout.jsx'
+import Toast from '../../components/Toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShoppingBag, 
@@ -67,6 +68,7 @@ export default function ProductsPage() {
   const [deleting, setDeleting] = useState(false)
 
   const [salesActionLoading, setSalesActionLoading] = useState({})
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   const isMountedRef = useRef(true)
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function ProductsPage() {
       // Tenta carregar produtos
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, price, stock, description, photo_url, active, created_at')
         .eq('barbershop_id', barbershop.id)
         .order('created_at', { ascending: false })
 
@@ -114,7 +116,7 @@ export default function ProductsPage() {
         // Tenta carregar vendas
         const { data: salesData, error: salesError } = await supabase
           .from('product_sales')
-          .select('*')
+          .select('id, customer_id, product_id, quantity, total_price, payment_status, payment_method, created_at')
           .eq('barbershop_id', barbershop.id)
           .order('created_at', { ascending: false })
 
@@ -126,8 +128,8 @@ export default function ProductsPage() {
           const productIds = [...new Set(salesData.map(sale => sale.product_id).filter(Boolean))]
           
           const [customersResponse, productsResponse] = await Promise.all([
-            customerIds.length > 0 ? supabase.from('customers').select('*').in('id', customerIds) : { data: [] },
-            productIds.length > 0 ? supabase.from('products').select('*').in('id', productIds) : { data: [] }
+            customerIds.length > 0 ? supabase.from('customers').select('id, name, email').in('id', customerIds) : { data: [] },
+            productIds.length > 0 ? supabase.from('products').select('id, name, price, photo_url').in('id', productIds) : { data: [] }
           ])
 
           if (!isMountedRef.current) return
@@ -413,7 +415,7 @@ export default function ProductsPage() {
       setModalOpen(false)
     } catch (err) {
       console.error('Erro ao salvar produto:', err)
-      alert('Erro ao salvar produto: ' + err.message)
+      setToast({ message: 'Erro ao salvar produto: ' + err.message, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -449,7 +451,7 @@ export default function ProductsPage() {
       setProductToDelete(null)
     } catch (err) {
       console.error('Erro ao deletar produto:', err)
-      alert('Erro ao deletar produto: ' + err.message)
+      setToast({ message: 'Erro ao deletar produto: ' + err.message, type: 'error' })
     } finally {
       setDeleting(false)
     }
@@ -496,7 +498,7 @@ export default function ProductsPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao atualizar status da venda:', err)
-      alert('Erro ao atualizar status: ' + err.message)
+      setToast({ message: 'Erro ao atualizar status: ' + err.message, type: 'error' })
     } finally {
       setSalesActionLoading(prev => ({ ...prev, [saleId]: false }))
     }
@@ -1075,6 +1077,11 @@ export default function ProductsPage() {
         </AnimatePresence>
 
       </div>
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }

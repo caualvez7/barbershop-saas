@@ -47,7 +47,7 @@ export default function DashboardRootLayout({ children }) {
 
         const { data: shopData, error: shopError } = await supabase
           .from('barbershops')
-          .select('*')
+          .select('id, name, owner_name, email, plan, created_at, user_id, slug, phone, commercial_email')
           .eq('user_id', user.id)
           .single()
 
@@ -56,7 +56,7 @@ export default function DashboardRootLayout({ children }) {
           await supabase.auth.signOut()
           setSession(null)
           setBarbershop(null)
-          router.push('/login')
+          router.push('/login?error=no_shop')
           return
         }
 
@@ -80,7 +80,7 @@ export default function DashboardRootLayout({ children }) {
         try {
           const { data: shopData, error: shopError } = await supabase
             .from('barbershops')
-            .select('*')
+            .select('id, name, owner_name, email, plan, created_at, user_id, slug, phone, commercial_email')
             .eq('user_id', currentSession.user.id)
             .single()
 
@@ -89,7 +89,7 @@ export default function DashboardRootLayout({ children }) {
             await supabase.auth.signOut()
             setSession(null)
             setBarbershop(null)
-            router.push('/login')
+            router.push('/login?error=no_shop')
             return
           }
 

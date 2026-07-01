@@ -1,18 +1,44 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Scissors, Sparkles, Mail, Lock, AlertCircle, ChevronRight } from 'lucide-react'
 import { supabaseBarber as supabase } from '../../lib/supabase-barber.js'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const errorParam = searchParams.get('error')
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [shops, setShops] = useState([])
+
+  useEffect(() => {
+    setLoading(false)
+    if (errorParam === 'no_shop') {
+      setError('Esta conta não possui uma barbearia cadastrada. Se você é um cliente final, por favor acesse a página de agendamento da sua barbearia para fazer login.')
+      
+      const loadShops = async () => {
+        try {
+          const { data } = await supabase
+            .from('barbershops')
+            .select('name, slug')
+            .order('name', { ascending: true })
+          if (data) {
+            setShops(data)
+          }
+        } catch (err) {
+          console.error('Erro ao carregar barbearias:', err)
+        }
+      }
+      loadShops()
+    }
+  }, [errorParam])
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault()
@@ -71,7 +97,7 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-amber-400 mb-4 tracking-wider uppercase">
               <Sparkles className="w-3 h-3" />
-              <span>Painel do Cliente</span>
+              <span>Painel do Barbeiro</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
               Bem-vindo de volta
@@ -92,10 +118,30 @@ export default function LoginPage() {
               <motion.div 
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-6"
+                className="flex flex-col gap-3.5 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6"
               >
-                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <p className="text-xs text-red-400 font-medium">{error}</p>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-400 font-medium leading-relaxed">{error}</p>
+                </div>
+
+                {shops.length > 0 && (
+                  <div className="mt-1.5 pt-3 border-t border-red-500/10 flex flex-col gap-2">
+                    <p className="text-[10px] font-bold text-zinc-300 uppercase tracking-wider">Selecione sua barbearia para o painel do cliente:</p>
+                    <div className="grid grid-cols-1 gap-2 max-h-[160px] overflow-y-auto pr-1">
+                      {shops.map(shop => (
+                        <Link 
+                          key={shop.slug} 
+                          href={`/barber/${shop.slug}/auth`}
+                          className="px-3.5 py-2.5 bg-zinc-900/60 hover:bg-zinc-800 border border-zinc-850 hover:border-amber-500/30 rounded-lg text-xxs text-zinc-300 hover:text-amber-500 transition-all flex items-center justify-between no-underline"
+                        >
+                          <span className="font-semibold">{shop.name}</span>
+                          <span className="text-[9px] text-zinc-500 font-mono">/barber/{shop.slug}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -162,7 +208,7 @@ export default function LoginPage() {
 
       {/* FOOTER */}
       <footer className="py-6 border-t border-zinc-900/40 text-center">
-        <p className="text-[10px] text-zinc-600 font-light">
+        <p className="text-[10px] text-zinc-650 font-light">
           © 2026 BarberShopBR. Todos os direitos reservados.
         </p>
       </footer>
@@ -179,5 +225,18 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#030303] flex flex-col items-center justify-center text-zinc-500 font-sans gap-3">
+        <div className="w-8 h-8 rounded-full border border-t-amber-500 border-zinc-800 animate-spin" />
+        <p className="text-xs uppercase tracking-widest text-zinc-600 font-bold animate-pulse font-sans">Carregando...</p>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }

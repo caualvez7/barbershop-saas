@@ -46,7 +46,7 @@ export default function AppointmentsPage() {
         // Buscar todos os agendamentos do dia atual para ter uma visão completa
         const { data, error } = await supabase
           .from('appointments')
-          .select('*, services(name, price)')
+          .select('id, customer_name, customer_whatsapp, date, time, status, payment_status, payment_method, price, barber_id, service_id, services(name, price)')
           .eq('barbershop_id', barbershop.id)
           .eq('date', todayDate)
           .order('time', { ascending: true })

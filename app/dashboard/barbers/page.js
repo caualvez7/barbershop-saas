@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabaseBarber as supabase } from '../../../lib/supabase-barber.js'
 import { useRouter } from 'next/navigation'
 import DashboardLayout, { useTheme, useDashboard } from '../../components/DashboardLayout'
+import Toast from '../../components/Toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   UserPlus, 
@@ -60,6 +61,7 @@ export default function BarbersPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [barberToDelete, setBarberToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState({ message: '', type: 'error' })
 
   // Erros de Validação
   const [validationErrors, setValidationErrors] = useState({})
@@ -131,7 +133,7 @@ export default function BarbersPage() {
       // Trazer todos os barbeiros (ativos e inativos) da barbearia
       const { data: barbersData, error: barbersError } = await supabase
         .from('barbers')
-        .select('*')
+        .select('id, name, phone, email, bio, photo_url, active, commission_percentage')
         .eq('barbershop_id', barbershop.id)
         .order('created_at', { ascending: true })
 
@@ -162,7 +164,7 @@ export default function BarbersPage() {
     const file = e.target.files[0]
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert('A foto deve ter no máximo 2MB.')
+        setToast({ message: 'A foto deve ter no máximo 2MB.', type: 'warning' })
         return
       }
       setSelectedFile(file)
@@ -294,7 +296,7 @@ export default function BarbersPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao salvar barbeiro:', err)
-      alert(`Ocorreu um erro ao salvar o barbeiro: ${err.message}`)
+      setToast({ message: `Ocorreu um erro ao salvar o barbeiro: ${err.message}`, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -323,7 +325,10 @@ export default function BarbersPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao excluir barbeiro:', err)
-      alert(`Não foi possível excluir o barbeiro permanentemente.\n\nMotivo: Esse profissional possui histórico de agendamentos associado a ele no banco de dados.\n\nRecomendação: Em vez de excluir fisicamente, utilize a opção "Inativar" (ícone de desativação) na aba "Ativos" para removê-lo da agenda sem perder o histórico.`)
+      setToast({ 
+        message: 'Não foi possível excluir o barbeiro permanentemente pois ele possui histórico de agendamentos. Recomendação: utilize a opção "Inativar" para removê-lo da agenda sem perder o histórico.', 
+        type: 'error' 
+      })
     } finally {
       setDeleting(false)
     }
@@ -341,7 +346,7 @@ export default function BarbersPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao inativar barbeiro:', err)
-      alert('Ocorreu um erro ao inativar o profissional.')
+      setToast({ message: 'Ocorreu um erro ao inativar o profissional.', type: 'error' })
     }
   }
 
@@ -357,7 +362,7 @@ export default function BarbersPage() {
       await loadData()
     } catch (err) {
       console.error('Erro ao reativar barbeiro:', err)
-      alert('Ocorreu um erro ao reativar o profissional.')
+      setToast({ message: 'Ocorreu um erro ao reativar o profissional.', type: 'error' })
     }
   }
 
@@ -1031,7 +1036,11 @@ export default function BarbersPage() {
           </div>
         )}
       </AnimatePresence>
-
+      <Toast 
+        message={toast.message} 
+        type={toast.type} 
+        onClose={() => setToast({ message: '', type: 'error' })} 
+      />
     </DashboardLayout>
   )
 }
