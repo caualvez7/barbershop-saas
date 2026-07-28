@@ -40,13 +40,17 @@ export default function AppointmentsPage() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const todayDate = new Date().toISOString().split('T')[0]
+        const d = new Date()
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const dt = String(d.getDate()).padStart(2, '0')
+        const todayDate = `${y}-${m}-${dt}`
         if (isMountedRef.current) setToday(todayDate)
 
         // Buscar todos os agendamentos do dia atual para ter uma visão completa
         const { data, error } = await supabase
           .from('appointments')
-          .select('id, customer_name, customer_whatsapp, date, time, status, payment_status, payment_method, price, barber_id, service_id, services(name, price)')
+          .select('id, customer_name, customer_whatsapp, date, time, status, barber_id, service_id, services(name, price)')
           .eq('barbershop_id', barbershop.id)
           .eq('date', todayDate)
           .order('time', { ascending: true })
@@ -62,7 +66,24 @@ export default function AppointmentsPage() {
         }
       }
     }
+
     loadData()
+
+    // Inscrever em alterações em tempo real no banco do Supabase
+    const channel = supabase
+      .channel(`appts-list-${barbershop.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `barbershop_id=eq.${barbershop.id}` }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    const onFocus = () => loadData()
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      supabase.removeChannel(channel)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [barbershop, layoutLoading, router])
 
   const formatDate = (dateStr) => {

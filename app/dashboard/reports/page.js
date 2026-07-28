@@ -54,14 +54,20 @@ export default function ReportsPage() {
   const { barbershop, loading: layoutLoading } = useDashboard()
   const [loading, setLoading] = useState(true)
 
-  // Estados dos Filtros
+  // Estados dos Filtros — inicializar com mês/ano corrente
+  const _now = new Date()
+  const _curMonth = _now.getMonth()       // 0-indexed
+  const _curYear  = String(_now.getFullYear())
+  const _curStart = `${_now.getFullYear()}-${String(_curMonth + 1).padStart(2,'0')}-01`
+  const _curEnd   = (() => { const d = new Date(_now.getFullYear(), _curMonth + 1, 0); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getDate()}` })()
+
   const [timeFilter, setTimeFilter] = useState('month') // 'month' | 'year' | 'custom'
-  const [selectedMonth, setSelectedMonth] = useState(5) // Junho (0-indexed: 5)
-  const [selectedYear, setSelectedYear] = useState('2026')
-  const [startDate, setStartDate] = useState('2026-06-01')
-  const [endDate, setEndDate] = useState('2026-06-30')
-  const [inputStartDate, setInputStartDate] = useState('2026-06-01')
-  const [inputEndDate, setInputEndDate] = useState('2026-06-30')
+  const [selectedMonth, setSelectedMonth] = useState(_curMonth)
+  const [selectedYear, setSelectedYear] = useState(_curYear)
+  const [startDate, setStartDate] = useState(_curStart)
+  const [endDate, setEndDate] = useState(_curEnd)
+  const [inputStartDate, setInputStartDate] = useState(_curStart)
+  const [inputEndDate, setInputEndDate] = useState(_curEnd)
 
   const isMountedRef = useRef(true)
   useEffect(() => {
@@ -154,14 +160,14 @@ export default function ReportsPage() {
         barbersRes,
         servicesRes
       ] = await Promise.all([
-        supabase.from('appointments').select('id, status, date, time, barber_id, price, service_id, services(name, price), barbers(name, photo_url)').eq('barbershop_id', barbershop.id).gte('date', currentStart).lte('date', currentEnd),
-        supabase.from('product_sales').select('id, product_id, quantity, total_price, payment_status, created_at, products(name, brand, price)').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
+        supabase.from('appointments').select('id, status, date, time, barber_id, service_id, services(name, price), barbers(name, photo_url)').eq('barbershop_id', barbershop.id).gte('date', currentStart).lte('date', currentEnd),
+        supabase.from('product_sales').select('id, product_id, quantity, price_at_purchase, payment_status, created_at, products(name, brand, price)').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
         supabase.from('subscriptions').select('id, plan_name, price, status, created_at').eq('barbershop_id', barbershop.id).gte('created_at', `${currentStart}T00:00:00`).lte('created_at', `${currentEnd}T23:59:59`),
-        supabase.from('appointments').select('id, status, date, price, service_id, services(name, price)').eq('barbershop_id', barbershop.id).gte('date', previousStart).lte('date', previousEnd),
-        supabase.from('product_sales').select('id, product_id, quantity, total_price, payment_status, created_at, products(name)').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
+        supabase.from('appointments').select('id, status, date, service_id, services(name, price)').eq('barbershop_id', barbershop.id).gte('date', previousStart).lte('date', previousEnd),
+        supabase.from('product_sales').select('id, product_id, quantity, price_at_purchase, payment_status, created_at, products(name)').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
         supabase.from('subscriptions').select('id, plan_name, price, status, created_at').eq('barbershop_id', barbershop.id).gte('created_at', `${previousStart}T00:00:00`).lte('created_at', `${previousEnd}T23:59:59`),
-        supabase.from('barbers').select('id, name, active, commission_percentage').eq('barbershop_id', barbershop.id),
-        supabase.from('services').select('id, name, price, active').eq('barbershop_id', barbershop.id)
+        supabase.from('barbers').select('id, name, active, photo_url, commission_percentage').eq('barbershop_id', barbershop.id),
+        supabase.from('services').select('id, name, price').eq('barbershop_id', barbershop.id)
       ])
 
       if (!isMountedRef.current) return
@@ -252,10 +258,17 @@ export default function ReportsPage() {
 
       const barberMap = {}
       ;(barbersRes.data || []).forEach(b => {
-        barberMap[b.id] = { id: b.id, name: b.name, photo_url: b.photo_url, completedCount: 0, revenue: 0 }
+        barberMap[b.id] = { 
+          id: b.id, 
+          name: b.name, 
+          photo_url: b.photo_url, 
+          completedCount: 0, 
+          revenue: 0,
+          commission_percentage: b.commission_percentage 
+        }
       })
 
-      appts.filter(a => a.status === 'Concluído').forEach(appt => {
+      appts.filter(a => a.status === 'Concluído' || a.status === 'Confirmado').forEach(appt => {
         if (barberMap[appt.barber_id]) {
           barberMap[appt.barber_id].completedCount += 1
           barberMap[appt.barber_id].revenue += Number(appt.services?.price || 0)
@@ -263,8 +276,14 @@ export default function ReportsPage() {
       })
       const realBarbers = Object.values(barberMap).sort((a, b) => b.revenue - a.revenue)
       const maxBarberRevenue = Math.max(...realBarbers.map(b => b.revenue), 1)
-      realBarbers.forEach(b => {
+      realBarbers.forEach((b, idx) => {
         b.revenuePercentage = Math.round((b.revenue / maxBarberRevenue) * 100)
+        b.ranking = idx + 1
+        b.appointments = b.completedCount
+        b.commissionPercent = b.commission_percentage || 35
+        b.commissionValue = (b.revenue * b.commissionPercent) / 100
+        b.ticket = b.appointments > 0 ? (b.revenue / b.appointments) : 0
+        b.photo = b.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop'
       })
       if (realBarbers.length > 0) {
         realBarbers[0].isTopPerformer = true
@@ -325,6 +344,22 @@ export default function ReportsPage() {
       return () => clearTimeout(timer)
     }
     loadRealReportData()
+
+    // Atualizar relatórios em tempo real quando novos agendamentos/vendas chegam
+    const channel = supabase
+      .channel(`reports-rt-${barbershop.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `barbershop_id=eq.${barbershop.id}` }, () => { loadRealReportData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_sales',  filter: `barbershop_id=eq.${barbershop.id}` }, () => { loadRealReportData() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions',  filter: `barbershop_id=eq.${barbershop.id}` }, () => { loadRealReportData() })
+      .subscribe()
+
+    const onFocus = () => loadRealReportData()
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      supabase.removeChannel(channel)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [barbershop, layoutLoading, loadRealReportData, router])
 
   if (!reportData) return null

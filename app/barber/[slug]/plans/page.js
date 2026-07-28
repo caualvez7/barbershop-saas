@@ -15,6 +15,8 @@ import {
 import ThreeBackground from '../../../components/ThreeBackground'
 import '../client-landing.css'
 
+import { getOrCreateCustomerProfile } from '../../../../lib/customer-profile.js'
+
 export default function PlansPage() {
   const params = useParams()
   const router = useRouter()
@@ -63,52 +65,7 @@ export default function PlansPage() {
         .eq('barbershop_id', shopData.id)
         .eq('active', true)
 
-      let { data: customerData } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('barbershop_id', shopData.id)
-        .maybeSingle()
-
-      if (!customerData) {
-        const { data: otherProfiles } = await supabase
-          .from('customers')
-          .select('name, whatsapp')
-          .eq('user_id', user.id)
-          .limit(1)
-
-        const name = otherProfiles?.[0]?.name || user.email?.split('@')[0] || 'Cliente'
-        const whatsapp = otherProfiles?.[0]?.whatsapp || ''
-
-        const { data: newCustomer, error: insertError } = await supabase
-          .from('customers')
-          .insert({
-            user_id: user.id,
-            barbershop_id: shopData.id,
-            name,
-            email: user.email,
-            whatsapp
-          })
-          .select()
-          .single()
-
-        if (!insertError && newCustomer) {
-          customerData = newCustomer
-        } else {
-          // Contingência: Tentar novo SELECT em caso de concorrência ou restrição de chave única
-          const { data: fallbackCustomer } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('barbershop_id', shopData.id)
-            .maybeSingle()
-
-          if (fallbackCustomer) {
-            customerData = fallbackCustomer
-          }
-        }
-      }
-
+      const customerData = await getOrCreateCustomerProfile(supabase, user, shopData)
 
       setShop(shopData)
       setPlans(plansData || [])

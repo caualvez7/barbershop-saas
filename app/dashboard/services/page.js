@@ -55,7 +55,7 @@ export default function ServicesPage() {
       setLoading(true)
       const { data, error } = await supabase
         .from('services')
-        .select('id, name, description, duration, price, active, created_at')
+        .select('id, name, duration, price')
         .eq('barbershop_id', barbershop.id)
         .order('id', { ascending: true })
 

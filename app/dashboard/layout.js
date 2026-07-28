@@ -70,35 +70,14 @@ export default function DashboardRootLayout({ children }) {
     }
     loadSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (event === 'SIGNED_OUT') {
         setSession(null)
         setBarbershop(null)
         router.push('/login')
-      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && currentSession) {
+      } else if (event === 'TOKEN_REFRESHED' && currentSession) {
+        // apenas atualiza a sessão — sem query ao banco
         setSession(currentSession)
-        try {
-          const { data: shopData, error: shopError } = await supabase
-            .from('barbershops')
-            .select('id, name, owner_name, email, plan, created_at, user_id, slug, phone, commercial_email')
-            .eq('user_id', currentSession.user.id)
-            .single()
-
-          if (shopError || !shopData) {
-            console.warn('Usuário sem barbearia associada no evento. Fazendo logout...')
-            await supabase.auth.signOut()
-            setSession(null)
-            setBarbershop(null)
-            router.push('/login?error=no_shop')
-            return
-          }
-
-          if (shopData?.id !== barbershopRef.current?.id) {
-            setBarbershop(shopData)
-          }
-        } catch (err) {
-          console.error('Erro ao sincronizar barbearia após mudança de auth:', err)
-        }
       }
     })
 

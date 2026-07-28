@@ -47,16 +47,54 @@ export default function CustomersPage() {
     const loadData = async () => {
       try {
         setLoading(true)
-        // 1. Carregar todos os clientes registrados da barbearia
+
+        // 1. Clientes registrados para esta barbearia
         const { data: customersData, error: customersError } = await supabase
           .from('customers')
-          .select('id, name, email, whatsapp, created_at')
+          .select('id, user_id, name, email, whatsapp, created_at')
           .eq('barbershop_id', barbershop.id)
-          .order('name', { ascending: true })
+          .order('created_at', { ascending: true })
 
         if (customersError) throw customersError
 
-        // 2. Carregar todas as assinaturas da barbearia
+        // 2. Deduplicar por user_id — manter o primeiro registro (o mais antigo, ou seja, o original)
+        // Múltiplos registros para o mesmo user podem existir por bugs de criação anterior
+        const seenUserIds = new Set()
+        const uniqueCustomers = []
+        for (const cust of (customersData || [])) {
+          const key = cust.user_id || cust.id
+          if (!seenUserIds.has(key)) {
+            seenUserIds.add(key)
+            uniqueCustomers.push(cust)
+          }
+        }
+
+        // 3. Contar agendamentos por customer_id (todos os IDs do mesmo usuário agrupados)
+        const { data: apptsData } = await supabase
+          .from('appointments')
+          .select('customer_id, status')
+          .eq('barbershop_id', barbershop.id)
+
+        // Mapear todos os customer_ids que pertencem a cada user_id
+        const userIdToCustomerIds = {}
+        for (const cust of (customersData || [])) {
+          const key = cust.user_id || cust.id
+          if (!userIdToCustomerIds[key]) userIdToCustomerIds[key] = []
+          userIdToCustomerIds[key].push(cust.id)
+        }
+
+        const appointmentCountByUserId = {}
+        for (const appt of (apptsData || [])) {
+          // Descobrir qual user_id dono deste customer_id
+          for (const [uid, ids] of Object.entries(userIdToCustomerIds)) {
+            if (ids.includes(appt.customer_id)) {
+              appointmentCountByUserId[uid] = (appointmentCountByUserId[uid] || 0) + 1
+              break
+            }
+          }
+        }
+
+        // 4. Assinaturas — uma por cliente
         const { data: subsData, error: subsError } = await supabase
           .from('subscriptions')
           .select('id, customer_id, plan_name, price, status, starts_at, expires_at, created_at')
@@ -64,7 +102,7 @@ export default function CustomersPage() {
 
         if (subsError) throw subsError
 
-        // 3. Mesclar dados para garantir que mesmo clientes sem assinatura ativa apareçam
+        // Mapear assinatura mais relevante por customer_id
         const subMap = {}
         subsData?.forEach(sub => {
           const current = subMap[sub.customer_id]
@@ -73,13 +111,13 @@ export default function CustomersPage() {
           }
         })
 
-        const merged = (customersData || []).map(cust => {
+        // 5. Montar lista final de clientes únicos
+        const merged = uniqueCustomers.map(cust => {
           const sub = subMap[cust.id]
+          const uid = cust.user_id || cust.id
+          const totalAppointments = appointmentCountByUserId[uid] || 0
           if (sub) {
-            return {
-              ...sub,
-              customer: cust
-            }
+            return { ...sub, customer: cust, totalAppointments }
           } else {
             return {
               id: `no-sub-${cust.id}`,
@@ -91,15 +129,16 @@ export default function CustomersPage() {
               starts_at: null,
               expires_at: null,
               created_at: cust.created_at,
-              customer: cust
+              customer: cust,
+              totalAppointments
             }
           }
         })
 
-        // Ordenar por prioridade de status: ativos, depois pendentes, depois cancelados, por fim sem assinatura
+        // Ordenar: ativos, pendentes, cancelados, sem assinatura
         merged.sort((a, b) => {
-          const statusOrder = { active: 1, pending: 2, cancelled: 3, none: 4 }
-          return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99)
+          const order = { active: 1, pending: 2, cancelled: 3, none: 4 }
+          return (order[a.status] || 99) - (order[b.status] || 99)
         })
 
         setSubscriptions(merged)
@@ -109,7 +148,24 @@ export default function CustomersPage() {
         setLoading(false)
       }
     }
+
     loadData()
+
+    // Atualizar em tempo real quando novos agendamentos/assinaturas chegam
+    const channel = supabase
+      .channel(`customers-rt-${barbershop.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments',   filter: `barbershop_id=eq.${barbershop.id}` }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers',      filter: `barbershop_id=eq.${barbershop.id}` }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions',  filter: `barbershop_id=eq.${barbershop.id}` }, () => loadData())
+      .subscribe()
+
+    const onFocus = () => loadData()
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      supabase.removeChannel(channel)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [barbershop, layoutLoading, router])
 
   // Limpar número do WhatsApp para o link wa.me
@@ -268,8 +324,8 @@ export default function CustomersPage() {
                 <thead>
                   <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${styles.tableHeader}`}>
                     <th className="px-6 py-4">Cliente</th>
+                    <th className="px-6 py-4">Agendamentos</th>
                     <th className="px-6 py-4">Plano</th>
-                    <th className="px-6 py-4">Período</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
@@ -314,32 +370,27 @@ export default function CustomersPage() {
                           </div>
                         </td>
 
+                        {/* Total de Agendamentos */}
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={12} className="text-amber-500/70" />
+                            <div className="flex flex-col">
+                              <span className={`font-bold ${styles.title}`}>{sub.totalAppointments}</span>
+                              <span className={`text-[10px] ${styles.subtext}`}>{sub.totalAppointments === 1 ? 'agendamento' : 'agendamentos'}</span>
+                            </div>
+                          </div>
+                        </td>
+
                         {/* Plano Assinado */}
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-0.5">
                             <span className={`font-bold ${styles.title}`}>{sub.plan_name}</span>
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              R$ {Number(sub.price).toFixed(2)}/mês
-                            </span>
+                            {sub.status !== 'none' && (
+                              <span className="text-[10px] text-zinc-500 font-mono">
+                                R$ {Number(sub.price).toFixed(2)}/mês
+                              </span>
+                            )}
                           </div>
-                        </td>
-
-                        {/* Período da Assinatura */}
-                        <td className="px-6 py-4 text-zinc-500">
-                          {sub.starts_at ? (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="flex items-center gap-1 text-[10px]">
-                                <Calendar size={9} />
-                                <span>Início: {new Date(sub.starts_at).toLocaleDateString('pt-BR')}</span>
-                              </span>
-                              <span className="flex items-center gap-1 text-[10px]">
-                                <Clock size={9} />
-                                <span>Expira: {new Date(sub.expires_at).toLocaleDateString('pt-BR')}</span>
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-zinc-500 font-mono">N/A</span>
-                          )}
                         </td>
 
                         {/* Status */}

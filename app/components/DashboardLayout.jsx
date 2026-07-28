@@ -122,40 +122,9 @@ export default function DashboardLayout({ children }) {
           console.warn('Erro ao carregar product_sales do banco para notificações:', e)
         }
 
-        // 3. Buscar pedidos pendentes de retirada no localStorage
-        let localOrdersList = []
-        if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`barber_mock_orders_${barbershop.slug}`)
-          if (saved) {
-            try {
-              const orders = JSON.parse(saved)
-              localOrdersList = orders
-                .filter(o => o.status === 'pending')
-                .map(o => ({
-                  id: o.id,
-                  type: 'order',
-                  title: 'Pedido de Retirada Pendente (Local)',
-                  description: `${o.customer?.name || 'Cliente'} reservou ${o.product?.name || 'Produto'} (Qtd: ${o.quantity})`,
-                  link: '/dashboard/products',
-                  created_at: o.created_at || new Date().toISOString()
-                }))
-            } catch (e) {
-              console.error('Erro ao ler mock_orders para notificações:', e)
-            }
-          }
-        }
-
-        // Mesclar listas sem duplicar
-        const mergedOrders = [...pendingOrdersList]
-        localOrdersList.forEach(lo => {
-          const rawId = lo.id.replace('order-', '').replace('mock-', '')
-          if (!mergedOrders.some(mo => mo.id.toString().includes(rawId))) {
-            mergedOrders.push(lo)
-          }
-        })
-
-        const allNotifications = [...pendingAppsList, ...mergedOrders]
-        allNotifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        const allNotifications = [...pendingAppsList, ...pendingOrdersList].sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        )
 
         setNotifications(allNotifications)
         setNotificationsCount(allNotifications.length)

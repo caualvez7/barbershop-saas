@@ -14,7 +14,6 @@ import {
   X, 
   Check, 
   Loader2, 
-  AlertTriangle,
   Sparkles,
   Info,
   DollarSign,
@@ -47,7 +46,6 @@ export default function ProductsPage() {
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('products') // 'products' | 'orders'
-  const [databaseWarning, setDatabaseWarning] = useState(false)
 
   // Estados do Modal de Formulário de Produto
   const [modalOpen, setModalOpen] = useState(false)
@@ -67,9 +65,12 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Filtro de Busca e Vendas
+  const [searchTerm, setSearchTerm] = useState('')
   const [salesActionLoading, setSalesActionLoading] = useState({})
   const [toast, setToast] = useState({ message: '', type: 'error' })
 
+  // Garantir montagem limpa
   const isMountedRef = useRef(true)
   useEffect(() => {
     isMountedRef.current = true
@@ -83,226 +84,69 @@ export default function ProductsPage() {
     if (!barbershop) return
     try {
       setLoading(true)
-      // Tenta carregar produtos
+      // Carregar produtos do banco
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, price, stock, description, photo_url, active, created_at')
+        .select('id, name, brand, volume_ml, price, description, photo_url, active, created_at')
         .eq('barbershop_id', barbershop.id)
         .order('created_at', { ascending: false })
 
       if (!isMountedRef.current) return
 
       if (productsError) {
-        console.warn('Erro ao carregar produtos (tabela pode não existir):', productsError.message)
-        setDatabaseWarning(true)
-        // Modo fallback local
-        loadMockData(barbershop.id, barbershop.slug)
+        console.error('Erro ao carregar produtos:', productsError.message)
+        setToast({ message: 'Erro ao carregar produtos do Supabase: ' + productsError.message, type: 'error' })
+        setProducts([])
       } else {
         setProducts(productsData || [])
-        
-        // Carrega pedidos simulados locais do localStorage
-        let savedLocalOrders = []
-        if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`barber_mock_orders_${barbershop.slug}`)
-          if (saved) {
-            try {
-              savedLocalOrders = JSON.parse(saved)
-            } catch (e) {
-              console.error('Erro ao ler mock_orders:', e)
-            }
-          }
-        }
+      }
 
-        // Tenta carregar vendas
-        const { data: salesData, error: salesError } = await supabase
-          .from('product_sales')
-          .select('id, customer_id, product_id, quantity, total_price, payment_status, payment_method, created_at')
-          .eq('barbershop_id', barbershop.id)
-          .order('created_at', { ascending: false })
+      // Carregar vendas de produtos do banco
+      const { data: salesData, error: salesError } = await supabase
+        .from('product_sales')
+        .select('id, customer_id, product_id, quantity, price_at_purchase, status, payment_status, payment_method, created_at')
+        .eq('barbershop_id', barbershop.id)
+        .order('created_at', { ascending: false })
+
+      if (!isMountedRef.current) return
+
+      if (!salesError && salesData && salesData.length > 0) {
+        const customerIds = [...new Set(salesData.map(sale => sale.customer_id).filter(Boolean))]
+        const productIds = [...new Set(salesData.map(sale => sale.product_id).filter(Boolean))]
+        
+        const [customersResponse, productsResponse] = await Promise.all([
+          customerIds.length > 0 ? supabase.from('customers').select('id, name, email, whatsapp').in('id', customerIds) : { data: [] },
+          productIds.length > 0 ? supabase.from('products').select('id, name, brand, price, photo_url').in('id', productIds) : { data: [] }
+        ])
 
         if (!isMountedRef.current) return
 
-        if (!salesError && salesData && salesData.length > 0) {
-          // Carregar clientes relacionados manualmente para evitar erros de join PostgREST complexos
-          const customerIds = [...new Set(salesData.map(sale => sale.customer_id).filter(Boolean))]
-          const productIds = [...new Set(salesData.map(sale => sale.product_id).filter(Boolean))]
-          
-          const [customersResponse, productsResponse] = await Promise.all([
-            customerIds.length > 0 ? supabase.from('customers').select('id, name, email').in('id', customerIds) : { data: [] },
-            productIds.length > 0 ? supabase.from('products').select('id, name, price, photo_url').in('id', productIds) : { data: [] }
-          ])
+        const customerMap = {}
+        customersResponse.data?.forEach(c => { customerMap[c.id] = c })
 
-          if (!isMountedRef.current) return
+        const productMap = {}
+        productsResponse.data?.forEach(p => { productMap[p.id] = p })
 
-          const customerMap = {}
-          customersResponse.data?.forEach(c => { customerMap[c.id] = c })
-
-          const productMap = {}
-          productsResponse.data?.forEach(p => { productMap[p.id] = p })
-
-          const mergedSales = salesData.map(sale => ({
-            ...sale,
-            customer: customerMap[sale.customer_id] || { name: 'Cliente Removido', whatsapp: '', email: '' },
-            product: productMap[sale.product_id] || { name: 'Produto Removido', brand: '', price: sale.price_at_purchase, photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop' }
-          }))
-          
-          // Mesclar vendas locais do sandbox (que nao sobem pro banco ou de produtos mock)
-          const localOnly = savedLocalOrders.filter(lo => !mergedSales.some(db => db.id === lo.id))
-          setSales([...mergedSales, ...localOnly])
-        } else {
-          setSales(savedLocalOrders)
-        }
+        const mergedSales = salesData.map(sale => ({
+          ...sale,
+          customer: customerMap[sale.customer_id] || { name: 'Cliente Desconhecido', whatsapp: '', email: '' },
+          product: productMap[sale.product_id] || { name: 'Produto Removido', brand: '', price: sale.price_at_purchase, photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop' }
+        }))
+        
+        setSales(mergedSales)
+      } else {
+        setSales([])
       }
     } catch (err) {
       if (!isMountedRef.current) return
       console.error('Erro geral no carregamento:', err)
-      setDatabaseWarning(true)
-      loadMockData(barbershop.id, barbershop.slug)
+      setToast({ message: 'Erro ao carregar dados do produto: ' + err.message, type: 'error' })
     } finally {
       if (isMountedRef.current) {
         setLoading(false)
       }
     }
   }, [barbershop])
-
-  // Carregar dados simulados em caso de falta de tabela no Supabase
-  const loadMockData = (shopId, slug) => {
-    let savedLocalProducts = []
-    if (typeof window !== 'undefined' && slug) {
-      const saved = localStorage.getItem(`barber_mock_products_${slug}`)
-      if (saved) {
-        try {
-          savedLocalProducts = JSON.parse(saved)
-        } catch (e) {
-          console.error('Erro ao ler mock_products:', e)
-        }
-      }
-    }
-
-    const defaultMockProducts = [
-      {
-        id: 'mock-1',
-        name: 'Shampoo Carbon Cabelo & Barba',
-        brand: 'L\'Oréal Men Expert',
-        volume_ml: 250,
-        price: 59.90,
-        description: 'Shampoo purificante enriquecido com carvão ativado. Limpa profundamente e elimina impurezas da fibra capilar e dos fios da barba.',
-        photo_url: IMAGE_PRESETS[0].url,
-        active: true,
-        barbershop_id: shopId
-      },
-      {
-        id: 'mock-2',
-        name: 'Condicionador Hidratante Silk',
-        brand: 'Keune Haircosmetics',
-        volume_ml: 200,
-        price: 49.90,
-        description: 'Condicionador de nutrição profunda. Deixa os fios macios, maleáveis e fáceis de pentear, com brilho natural incomparável.',
-        photo_url: IMAGE_PRESETS[1].url,
-        active: true,
-        barbershop_id: shopId
-      },
-      {
-        id: 'mock-3',
-        name: 'Pomada Matte Modeladora Strong',
-        brand: 'Redken Brews',
-        volume_ml: 100,
-        price: 79.90,
-        description: 'Pomada modeladora com fixação forte e acabamento matte opaco. Ideal para penteados estruturados com aspect natural.',
-        photo_url: IMAGE_PRESETS[2].url,
-        active: true,
-        barbershop_id: shopId
-      },
-      {
-        id: 'mock-4',
-        name: 'Óleo de Barba Maciez Suprema',
-        brand: 'Beard Alchemist',
-        volume_ml: 50,
-        price: 39.90,
-        description: 'Blend de óleos essenciais hidratantes para barbas longas e ressecadas. Amacia instantaneamente os pelos rebeldes.',
-        photo_url: IMAGE_PRESETS[3].url,
-        active: true,
-        barbershop_id: shopId
-      }
-    ]
-
-    const productsList = savedLocalProducts.length > 0 ? savedLocalProducts : defaultMockProducts
-    if (isMountedRef.current) setProducts(productsList)
-    if (typeof window !== 'undefined' && slug && savedLocalProducts.length === 0) {
-      localStorage.setItem(`barber_mock_products_${slug}`, JSON.stringify(defaultMockProducts))
-    }
-
-    const mockProducts = productsList
-
-    const mockSales = [
-      {
-        id: 'mock-sale-1',
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-        product_id: 'mock-3',
-        customer_id: 'mock-cust-1',
-        quantity: 1,
-        price_at_purchase: 79.90,
-        status: 'pending',
-        payment_method: 'online',
-        payment_status: 'paid',
-        customer: {
-          name: 'João Pedro Silva',
-          whatsapp: '(11) 98888-7777',
-          email: 'joaopedro@gmail.com'
-        },
-        product: mockProducts[2]
-      },
-      {
-        id: 'mock-sale-2',
-        created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-        product_id: 'mock-1',
-        customer_id: 'mock-cust-2',
-        quantity: 2,
-        price_at_purchase: 59.90,
-        status: 'picked_up',
-        payment_method: 'pickup',
-        payment_status: 'paid',
-        customer: {
-          name: 'Guilherme Santos',
-          whatsapp: '(11) 97777-6666',
-          email: 'guilherme@vip.com.br'
-        },
-        product: mockProducts[0]
-      },
-      {
-        id: 'mock-sale-3',
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-        product_id: 'mock-4',
-        customer_id: 'mock-cust-3',
-        quantity: 1,
-        price_at_purchase: 39.90,
-        status: 'pending',
-        payment_method: 'pickup',
-        payment_status: 'pending',
-        customer: {
-          name: 'Thiago Ramos',
-          whatsapp: '(11) 96666-5555',
-          email: 'thiago@hotmail.com'
-        },
-        product: mockProducts[3]
-      }
-    ]
-    
-    // Mesclar vendas locais do localStorage se houver slug no sandbox
-    let savedLocalOrders = []
-    if (typeof window !== 'undefined' && slug) {
-      const saved = localStorage.getItem(`barber_mock_orders_${slug}`)
-      if (saved) {
-        try {
-          savedLocalOrders = JSON.parse(saved)
-        } catch (e) {
-          console.error('Erro ao ler mock_orders:', e)
-        }
-      }
-    }
-    const localOnly = savedLocalOrders.filter(lo => !mockSales.some(db => db.id === lo.id))
-    if (isMountedRef.current) setSales([...mockSales, ...localOnly])
-  }
 
   useEffect(() => {
     loadData()
@@ -373,28 +217,6 @@ export default function ProductsPage() {
       active: true
     }
 
-    if (databaseWarning) {
-      // Operações locais simuladas
-      let updatedProducts = []
-      if (modalMode === 'create') {
-        const newProduct = {
-          ...payload,
-          id: 'mock-' + Date.now(),
-          created_at: new Date().toISOString()
-        }
-        updatedProducts = [newProduct, ...products]
-      } else {
-        updatedProducts = products.map(p => p.id === currentProductId ? { ...p, ...payload } : p)
-      }
-      setProducts(updatedProducts)
-      if (typeof window !== 'undefined' && barbershop?.slug) {
-        localStorage.setItem(`barber_mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
-      }
-      setSaving(false)
-      setModalOpen(false)
-      return
-    }
-
     try {
       if (modalMode === 'create') {
         const { error } = await supabase
@@ -402,6 +224,7 @@ export default function ProductsPage() {
           .insert(payload)
 
         if (error) throw error
+        setToast({ message: 'Produto cadastrado com sucesso!', type: 'success' })
       } else {
         const { error } = await supabase
           .from('products')
@@ -409,6 +232,7 @@ export default function ProductsPage() {
           .eq('id', currentProductId)
 
         if (error) throw error
+        setToast({ message: 'Produto atualizado com sucesso!', type: 'success' })
       }
 
       await loadData()
@@ -426,18 +250,6 @@ export default function ProductsPage() {
     if (!productToDelete) return
     setDeleting(true)
 
-    if (databaseWarning) {
-      const updatedProducts = products.filter(p => p.id !== productToDelete.id)
-      setProducts(updatedProducts)
-      if (typeof window !== 'undefined' && barbershop?.slug) {
-        localStorage.setItem(`barber_mock_products_${barbershop.slug}`, JSON.stringify(updatedProducts))
-      }
-      setDeleting(false)
-      setDeleteModalOpen(false)
-      setProductToDelete(null)
-      return
-    }
-
     try {
       const { error } = await supabase
         .from('products')
@@ -446,6 +258,7 @@ export default function ProductsPage() {
 
       if (error) throw error
 
+      setToast({ message: 'Produto removido com sucesso!', type: 'success' })
       await loadData()
       setDeleteModalOpen(false)
       setProductToDelete(null)
@@ -466,28 +279,6 @@ export default function ProductsPage() {
       updatePayload.payment_status = 'paid'
     }
 
-    const isLocalOrder = saleId.toString().startsWith('order-') || saleId.toString().startsWith('mock-')
-
-    if (databaseWarning || isLocalOrder) {
-      const updatedSales = sales.map(s => s.id === saleId 
-        ? { 
-            ...s, 
-            status: nextStatus, 
-            ...(nextStatus === 'picked_up' ? { payment_status: 'paid' } : {}) 
-          } 
-        : s
-      )
-      setSales(updatedSales)
-      
-      // Salva de volta nas ordens simuladas do localStorage
-      if (typeof window !== 'undefined' && barbershop?.slug) {
-        const localOrders = updatedSales.filter(s => s.id.toString().startsWith('order-') || s.id.toString().startsWith('mock-'))
-        localStorage.setItem(`barber_mock_orders_${barbershop.slug}`, JSON.stringify(localOrders))
-      }
-      setSalesActionLoading(prev => ({ ...prev, [saleId]: false }))
-      return
-    }
-
     try {
       const { error } = await supabase
         .from('product_sales')
@@ -495,6 +286,7 @@ export default function ProductsPage() {
         .eq('id', saleId)
 
       if (error) throw error
+      setToast({ message: 'Status do pedido atualizado!', type: 'success' })
       await loadData()
     } catch (err) {
       console.error('Erro ao atualizar status da venda:', err)
@@ -550,19 +342,8 @@ export default function ProductsPage() {
           </button>
         </div>
 
-        {/* ALERTA DE BANCO DE DADOS (MOCK FALLBACK) */}
-        {databaseWarning && (
-          <div className="p-4 bg-amber-500/[0.03] border border-amber-500/20 text-amber-500/90 rounded-2xl flex items-start gap-3">
-            <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <span className="font-bold">Modo Sandbox Ativo: </span>
-              <span className="font-light">
-                A tabela `products` ou `product_sales` não foi encontrada no Supabase. Estamos utilizando o modo simulador local. 
-                Para integrar plenamente, execute os scripts SQL fornecidos no painel do Supabase.
-              </span>
-            </div>
-          </div>
-        )}
+
+
 
         {/* MENSAGEM OBRIGATÓRIA DE RETIRADA NA BARBEARIA */}
         <div className="p-4 bg-blue-500/[0.03] border border-blue-500/20 text-blue-400 rounded-2xl flex items-start gap-3">

@@ -21,11 +21,12 @@ import {
   ShoppingBag,
   CreditCard,
   QrCode,
-  Copy,
   CheckCircle2,
   XCircle,
   Loader2
 } from 'lucide-react'
+import { getOrCreateCustomerProfile } from '../../../../lib/customer-profile.js'
+import { ClientProductStore } from '../../../components/client/ClientProductStore'
 import ThreeBackground from '../../../components/ThreeBackground'
 import '../client-landing.css'
 
@@ -44,6 +45,13 @@ function generateSlots(openTime, closeTime) {
   return slots
 }
 
+function getLocalDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dt = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dt}`
+}
+
 function getNext7Days(businessHours) {
   const days = []
   const today = new Date()
@@ -57,7 +65,7 @@ function getNext7Days(businessHours) {
     if (hours?.is_open) {
       days.push({
         date,
-        dateStr: date.toISOString().split('T')[0],
+        dateStr: getLocalDateStr(date),
         label: date.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }),
         open_time: hours.open_time,
         close_time: hours.close_time,
@@ -109,7 +117,6 @@ export default function SchedulingPage() {
   // Novos estados para abas e gateway de pagamentos
   const [activeTab, setActiveTab] = useState('scheduling') // 'scheduling' | 'orders'
   const [customerOrders, setCustomerOrders] = useState([])
-  const [mockLocalOrders, setMockLocalOrders] = useState([])
   const [purchasePaymentMethod, setPurchasePaymentMethod] = useState('online') // 'online' | 'pickup'
   const [checkoutStep, setCheckoutStep] = useState('select_method') // 'select_method' | 'online_form' | 'online_processing' | 'success'
   const [onlinePaymentType, setOnlinePaymentType] = useState('credit_card') // 'credit_card' | 'pix'
@@ -154,64 +161,14 @@ export default function SchedulingPage() {
         return 
       }
 
-      let { data: customerData } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('barbershop_id', shopData.id)
-        .maybeSingle()
+      const customerData = await getOrCreateCustomerProfile(supabase, user, shopData)
 
       if (!isMounted) return
 
       if (!customerData) {
-        const { data: otherProfiles } = await supabase
-          .from('customers')
-          .select('name, whatsapp')
-          .eq('user_id', user.id)
-          .limit(1)
-
-        if (!isMounted) return
-
-        const name = otherProfiles?.[0]?.name || user.email?.split('@')[0] || 'Cliente'
-        const whatsapp = otherProfiles?.[0]?.whatsapp || ''
-
-        const { data: newCustomer, error: insertError } = await supabase
-          .from('customers')
-          .insert({
-            user_id: user.id,
-            barbershop_id: shopData.id,
-            name,
-            email: user.email,
-            whatsapp
-          })
-          .select()
-          .single()
-
-        if (!isMounted) return
-
-        if (!insertError && newCustomer) {
-          customerData = newCustomer
-        } else {
-          // Contingência: Tentar novo SELECT em caso de concorrência ou restrição de chave única
-          const { data: fallbackCustomer } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('barbershop_id', shopData.id)
-            .maybeSingle()
-
-          if (!isMounted) return
-
-          if (fallbackCustomer) {
-            customerData = fallbackCustomer
-          } else {
-            router.push(`/barber/${slug}/auth`)
-            return
-          }
-        }
+        router.push(`/barber/${slug}/auth`)
+        return
       }
-
-      if (!isMounted) return
 
       const [
         { data: servicesData },
@@ -220,7 +177,8 @@ export default function SchedulingPage() {
         { data: subscriptionData },
         { data: hoursData },
         { data: bookedData },
-        productsResult,
+        { data: productsData },
+        { data: salesData }
       ] = await Promise.all([
         supabase.from('services').select('*').eq('barbershop_id', shopData.id),
         supabase.from('barbers').select('*').eq('barbershop_id', shopData.id).eq('active', true),
@@ -228,9 +186,8 @@ export default function SchedulingPage() {
         supabase.from('subscriptions').select('*').eq('customer_id', customerData.id).in('status', ['pending', 'active']).maybeSingle(),
         supabase.from('business_hours').select('*').eq('barbershop_id', shopData.id),
         supabase.from('appointments').select('barber_id, date, time').eq('barbershop_id', shopData.id).eq('status', 'Pendente'),
-        supabase.from('products').select('*').eq('barbershop_id', shopData.id).eq('active', true)
-          .then(res => res)
-          .catch(err => ({ data: null, error: err }))
+        supabase.from('products').select('*').eq('barbershop_id', shopData.id).eq('active', true),
+        supabase.from('product_sales').select('*').eq('customer_id', customerData.id).order('created_at', { ascending: false })
       ])
 
       if (!isMounted) return
@@ -243,121 +200,27 @@ export default function SchedulingPage() {
       setSubscription(subscriptionData)
       setBusinessHours(hoursData || [])
       setBookedSlots(bookedData || [])
+      setProducts(productsData || [])
 
-      let productsList = productsResult?.data || []
-      if (!productsResult?.data || productsResult.error || productsList.length === 0) {
-        console.warn('Produtos indisponíveis no banco, ativando fallback local.')
-        let savedLocalProducts = []
-        if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem(`customer_mock_products_${shopData.slug}`)
-          if (saved) {
-            try {
-              savedLocalProducts = JSON.parse(saved)
-            } catch (e) {
-              console.error('Erro ao ler mock_products:', e)
-            }
-          }
-        }
-
-        if (savedLocalProducts.length > 0) {
-          productsList = savedLocalProducts
-        } else {
-          productsList = [
-            {
-              id: 'mock-1',
-              name: 'Shampoo Carbon Cabelo & Barba',
-              brand: 'L\'Oréal Men Expert',
-              volume_ml: 250,
-              price: 59.90,
-              description: 'Shampoo purificante enriquecido com carvão ativado. Limpa profundamente e elimina impurezas da fibra capilar e dos fios da barba.',
-              photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop',
-              active: true
-            },
-            {
-              id: 'mock-2',
-              name: 'Condicionador Hidratante Silk',
-              brand: 'Keune Haircosmetics',
-              volume_ml: 200,
-              price: 49.90,
-              description: 'Condicionador de nutrição profunda. Deixa os fios macios, maleáveis e fáceis de pentear, com brilho natural incomparável.',
-              photo_url: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?q=80&w=600&auto=format&fit=crop',
-              active: true
-            },
-            {
-              id: 'mock-3',
-              name: 'Pomada Matte Modeladora Strong',
-              brand: 'Redken Brews',
-              volume_ml: 100,
-              price: 79.90,
-              description: 'Pomada modeladora com fixação forte e acabamento matte opaco. Ideal para penteados estruturados com aspect natural.',
-              photo_url: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?q=80&w=600&auto=format&fit=crop',
-              active: true
-            },
-            {
-              id: 'mock-4',
-              name: 'Óleo de Barba Maciez Suprema',
-              brand: 'Beard Alchemist',
-              volume_ml: 50,
-              price: 39.90,
-              description: 'Blend de óleos essenciais hidratantes para barbas longas e ressecadas. Amacia instantaneamente os pelos rebeldes.',
-              photo_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?q=80&w=600&auto=format&fit=crop',
-              active: true
-            }
-          ]
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(`customer_mock_products_${shopData.slug}`, JSON.stringify(productsList))
-          }
-        }
-      }
-      if (isMounted) setProducts(productsList)
-
-      // Carregar pedidos do cliente logado
-      let savedLocalOrders = []
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(`customer_mock_orders_${slug}`)
-        if (saved) {
-          try {
-            savedLocalOrders = JSON.parse(saved)
-            if (isMounted) setMockLocalOrders(savedLocalOrders)
-          } catch (e) {
-            console.error('Erro ao ler mock_orders:', e)
-          }
-        }
-      }
-
-      try {
-        const { data: salesData, error: salesError } = await supabase
-          .from('product_sales')
-          .select('*')
-          .eq('customer_id', customerData.id)
-          .order('created_at', { ascending: false })
-
+      if (salesData && salesData.length > 0) {
+        const productIds = [...new Set(salesData.map(s => s.product_id).filter(Boolean))]
+        const { data: pData } = productIds.length > 0 
+          ? await supabase.from('products').select('*').in('id', productIds) 
+          : { data: [] }
+        
         if (!isMounted) return
 
-        if (salesError) throw salesError
+        const pMap = {}
+        pData?.forEach(p => { pMap[p.id] = p })
 
-        if (salesData && salesData.length > 0) {
-          const productIds = [...new Set(salesData.map(s => s.product_id).filter(Boolean))]
-          const { data: pData } = await supabase.from('products').select('*').in('id', productIds)
-          
-          if (!isMounted) return
-
-          const pMap = {}
-          pData?.forEach(p => { pMap[p.id] = p })
-
-          const mergedSales = salesData.map(s => ({
-            ...s,
-            product: pMap[s.product_id] || productsList.find(p => p.id === s.product_id) || { name: 'Produto Indisponível', brand: '', price: s.price_at_purchase, photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop' }
-          }))
-          
-          const localOnly = savedLocalOrders.filter(lo => !mergedSales.some(db => db.id === lo.id))
-          if (isMounted) setCustomerOrders([...mergedSales, ...localOnly])
-        } else {
-          if (isMounted) setCustomerOrders(savedLocalOrders)
-        }
-      } catch (err) {
-        console.warn('Erro ao carregar vendas do banco:', err.message)
-        if (isMounted) setCustomerOrders(savedLocalOrders)
+        const mergedSales = salesData.map(s => ({
+          ...s,
+          product: pMap[s.product_id] || { name: 'Produto Removido', brand: '', price: s.price_at_purchase, photo_url: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?q=80&w=600&auto=format&fit=crop' }
+        }))
+        
+        if (isMounted) setCustomerOrders(mergedSales)
+      } else {
+        if (isMounted) setCustomerOrders([])
       }
 
       if (isMounted) setLoading(false)
@@ -423,9 +286,9 @@ export default function SchedulingPage() {
     setSaving(true)
 
     const { error } = await supabase.from('appointments').insert({
-      customer_id: customer.id,
-      customer_name: customer.name,
-      customer_whatsapp: customer.whatsapp,
+      customer_id: customer?.id || null,
+      customer_name: customer?.name || 'Cliente',
+      customer_whatsapp: customer?.whatsapp || '',
       service_id: selectedService.id,
       barber_id: selectedBarber.id,
       date: selectedDay.dateStr,
@@ -480,15 +343,6 @@ export default function SchedulingPage() {
     setSavingPlan(null)
   }
 
-  const addOrder = (newOrder) => {
-    setCustomerOrders(prev => [newOrder, ...prev])
-    const updatedMock = [newOrder, ...mockLocalOrders]
-    setMockLocalOrders(updatedMock)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`customer_mock_orders_${slug}`, JSON.stringify(updatedMock))
-    }
-  }
-
   const handlePurchaseProduct = async () => {
     if (!customer || !selectedProduct) return
     setPurchaseSaving(true)
@@ -500,7 +354,7 @@ export default function SchedulingPage() {
     const payload = {
       customer_id: customer.id,
       barbershop_id: shop.id,
-      product_id: selectedProduct.id.startsWith('mock-') ? null : selectedProduct.id,
+      product_id: selectedProduct.id,
       quantity: purchaseQuantity,
       price_at_purchase: selectedProduct.price,
       status: 'pending',
@@ -508,49 +362,28 @@ export default function SchedulingPage() {
       payment_status: statusPayment
     }
 
-    const orderId = 'order-' + Date.now()
-    const newLocalOrder = {
-      id: orderId,
-      created_at: new Date().toISOString(),
-      customer_id: customer.id,
-      barbershop_id: shop.id,
-      product_id: selectedProduct.id,
-      quantity: purchaseQuantity,
-      price_at_purchase: selectedProduct.price,
-      status: 'pending',
-      payment_method: purchasePaymentMethod,
-      payment_status: statusPayment,
-      product: selectedProduct
-    }
-
-    if (selectedProduct.id.startsWith('mock-')) {
-      addOrder(newLocalOrder)
-      setPurchaseSaving(false)
-      setPurchaseSuccess(true)
-      setCheckoutStep('success')
-      return
-    }
-
     try {
-      const { error } = await supabase.from('product_sales').insert(payload)
-      if (error) {
-        console.warn('Erro ao registrar venda no banco. Simulando localmente:', error.message)
-        addOrder(newLocalOrder)
-        setPurchaseSaving(false)
-        setPurchaseSuccess(true)
-        setCheckoutStep('success')
-        return
+      const { data, error } = await supabase
+        .from('product_sales')
+        .insert(payload)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      const newOrder = {
+        ...(data || payload),
+        product: selectedProduct
       }
-      addOrder(newLocalOrder)
+
+      setCustomerOrders(prev => [newOrder, ...prev])
       setPurchaseSaving(false)
       setPurchaseSuccess(true)
       setCheckoutStep('success')
     } catch (err) {
-      console.warn('Erro na conexao. Simulando localmente:', err)
-      addOrder(newLocalOrder)
+      console.error('Erro ao registrar pedido:', err)
+      setPurchaseError('Erro ao registrar pedido: ' + err.message)
       setPurchaseSaving(false)
-      setPurchaseSuccess(true)
-      setCheckoutStep('success')
     }
   }
 
